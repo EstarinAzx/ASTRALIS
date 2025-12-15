@@ -1,0 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// User Model - Authentication
+// ============================================================================
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  analyses AnalysisHistory[]
+
+  @@map("users")
+}
+
+// ============================================================================
+// AnalysisHistory Model - Stores ASTRALIS results per file
+// ============================================================================
+model AnalysisHistory {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  fileName  String   @map("file_name")
+  fileHash  String   @map("file_hash") // SHA256 of file content for caching
+  language  String
+  mode      String // "concise" | "standard" | "deep_dive"
+  result    Json // The full ASTRALIS JSON response
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes for efficient lookup
+  @@index([userId])
+  @@index([fileHash])
+  @@map("analysis_history")
+}
