@@ -125,9 +125,22 @@ RESPOND WITH ONLY VALID JSON:
     }
   ],
   "edges": [
-    { "id": "e1", "source": "node1", "target": "node2", "label": "Yes/No or empty" }
+    { "id": "e1", "source": "node1", "target": "node2", "label": "" },
+    { "id": "e2", "source": "decision1", "target": "yes_node", "label": "Yes" },
+    { "id": "e3", "source": "decision1", "target": "no_node", "label": "No" }
   ]
 }
+
+CRITICAL EDGE RULES:
+1. EVERY node (except the last) must have at least one outgoing edge
+2. Edges must form a connected graph - no isolated nodes!
+3. For decision nodes (diamonds):
+   - MUST have exactly 2 outgoing edges
+   - One labeled "Yes", one labeled "No"
+   - Yes = positive/success path, No = negative/error path
+4. For regular nodes: edge to the next logical step (no label needed)
+5. Edge "source" = where arrow starts, "target" = where arrow points
+6. Use sequential IDs: e1, e2, e3, etc.
 
 SHAPES:
 - "rectangle" = State, definitions, assignments, setup steps
@@ -213,29 +226,48 @@ export async function callLLM(
                     { role: 'user', content: userPrompt },
                 ],
                 temperature: 0.3,
-                max_tokens: 4000,
+                max_tokens: 8000,
             }),
         });
 
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ OpenRouter error:', response.status, errorText);
             throw new Error(`API error: ${response.status}`);
         }
 
         const data = await response.json() as {
             choices?: { message?: { content?: string } }[];
         };
-        const content = data.choices?.[0]?.message?.content;
+        let content = data.choices?.[0]?.message?.content;
 
         if (!content) {
+            console.error('❌ No content in response:', JSON.stringify(data).substring(0, 500));
             throw new Error('No content in response');
         }
 
+        console.log('📥 Raw LLM response (first 500 chars):', content.substring(0, 500));
+
+        // Extract JSON from markdown code blocks if present
+        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) {
+            content = jsonMatch[1].trim();
+            console.log('📦 Extracted JSON from code block');
+        }
+
+        // Try to find JSON object if response has extra text
+        const jsonStart = content.indexOf('{');
+        const jsonEnd = content.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonStart < jsonEnd) {
+            content = content.substring(jsonStart, jsonEnd + 1);
+        }
+
         const parsed = JSON.parse(content) as AnalysisResult;
-        console.log('✅ LLM parsed successfully');
+        console.log('✅ LLM parsed successfully with', parsed.nodes?.length || 0, 'nodes');
         return parsed;
     } catch (error) {
-        console.error('LLM failed:', error);
-        console.log('⚠️ Falling back to mock');
+        console.error('❌ LLM failed:', error);
+        console.log('⚠️ Falling back to mock parser');
         return generateMockResponse(fileName, language, code);
     }
 }
