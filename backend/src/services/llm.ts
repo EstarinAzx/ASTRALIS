@@ -331,13 +331,129 @@ export async function callLLM(
         const parsed = JSON.parse(content) as AnalysisResult;
         console.log('✅ LLM parsed successfully with', parsed.nodes?.length || 0, 'nodes');
 
-        // Validate and fill gaps
-        const validated = validateAndFillGaps(parsed, code, fileName, language);
-        return validated;
+        // 1. GAP VALIDATION (Mathematical)
+        console.log('🛡️ Step 1: Running Gap Validator...');
+        const gapFilled = validateAndFillGaps(parsed, code, fileName, language);
+
+        // 2. VERIFIER AGENT (LLM Audit)
+        console.log('🕵️ Step 2: Running Verifier Agent...');
+        const verified = await verifyFlowWithLLM(gapFilled, code, fileName, language);
+
+        return verified;
     } catch (error) {
         console.error('❌ LLM failed:', error);
         console.log('⚠️ Falling back to mock parser');
         return generateMockResponse(fileName, language, code);
+    }
+}
+
+// ============================================================================
+// Verifier Agent - Audits the flow for accuracy and hallucinations
+// ============================================================================
+async function verifyFlowWithLLM(
+    currentResult: AnalysisResult,
+    code: string,
+    fileName: string,
+    language: string
+): Promise<AnalysisResult> {
+    const apiKey = process.env.LLM_API_KEY;
+    const apiUrl = process.env.LLM_API_URL || 'https://openrouter.ai/api/v1/chat/completions';
+    const model = process.env.LLM_MODEL || 'meta-llama/llama-3.2-3b-instruct:free';
+
+    if (!apiKey) return currentResult; // Skip if no API key
+
+    const systemPrompt = `You are ASTRALIS VERIFIER - an advanced code auditor.
+YOUR JOB: strict audit of a generated flowchart against source code.
+
+PROCESS:
+1. "CRITIQUE": List every single error, hallucination, or label mismatch you find.
+2. "JSON": Return the FULL corrected JSON.
+
+AUDIT RULES:
+1. CHECK LABELS: Do node labels accurately reflect the code? 
+   - ❌ "Handle Submit" -> ✅ "Handle Form Submission"
+2. CHECK DIAMONDS: Must have "Yes" and "No" edges.
+3. CHECK LOGIC: Does the flow matches the code execution path?
+
+OUTPUT FORMAT:
+CRITIQUE:
+- Node X has wrong label...
+- Missing specific edge...
+
+JSON:
+\`\`\`json
+{ ...valid json... }
+\`\`\``;
+
+    const userPrompt = `AUDIT THIS FLOWCHART:
+
+SOURCE CODE:
+\`\`\`${language}
+${code}
+\`\`\`
+
+CURRENT FLOWCHART JSON:
+\`\`\`json
+${JSON.stringify(currentResult, null, 2)}
+\`\`\`
+
+Find every tiny inconsistency. Then return the PERFECTED JSON.`;
+
+    try {
+        console.log(`🕵️ Verifying with ${model}...`);
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': process.env.FRONTEND_URL || 'http://localhost:5173',
+                'X-Title': 'ASTRALIS-VERIFIER',
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt },
+                ],
+                temperature: 0.0, // ABSOLUTE ZERO for strict logic
+                max_tokens: 8000,
+            }),
+        });
+
+        if (!response.ok) {
+            console.error('❌ Verifier failed, returning unverified result');
+            return currentResult;
+        }
+
+        const data = await response.json() as { choices?: { message?: { content?: string } }[] };
+        let content = data.choices?.[0]?.message?.content;
+
+        if (!content) return currentResult;
+
+        console.log('📝 Verifier Critique Preview:', content.substring(0, 200) + '...');
+
+        // Extract JSON
+        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) {
+            content = jsonMatch[1].trim();
+        } else {
+            // Fallback: look for JSON block after "JSON:" or similar
+            const jsonStart = content.indexOf('{');
+            const jsonEnd = content.lastIndexOf('}');
+            if (jsonStart !== -1 && jsonEnd !== -1) {
+                content = content.substring(jsonStart, jsonEnd + 1);
+            }
+        }
+
+        const verifiedResult = JSON.parse(content) as AnalysisResult;
+        console.log(`✅ Verified! Node count: ${currentResult.nodes.length} -> ${verifiedResult.nodes.length}`);
+
+        return verifiedResult;
+
+    } catch (error) {
+        console.error('❌ Verifier loop error:', error);
+        return currentResult; // Fallback to original if verifier crashes
     }
 }
 
