@@ -39,11 +39,12 @@ export function DashboardPage() {
                 setError(null);
 
                 // api.get<T> returns { status: string, data: T }
-                // Backend data: { id, fileName, language, result: {...} }
+                // Backend data: { id, fileName, language, sourceCode, result: {...} }
                 interface AnalysisData {
                     id: string;
                     fileName: string;
                     language: string;
+                    sourceCode?: string;  // Original source code for inspector
                     result: AnalysisResult;
                 }
 
@@ -55,6 +56,7 @@ export function DashboardPage() {
                     const analysisResult = {
                         ...response.data.result,
                         id: response.data.id,
+                        sourceCode: response.data.sourceCode,  // Include source code
                     };
                     setResult(analysisResult);
                     // Select first node by default
@@ -195,7 +197,7 @@ export function DashboardPage() {
                 </div>
 
                 {/* Inspector */}
-                <InspectorPanel node={selectedNode} />
+                <InspectorPanel node={selectedNode} sourceCode={result.sourceCode} />
             </div>
         </div>
     );

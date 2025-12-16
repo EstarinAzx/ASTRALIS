@@ -36,6 +36,7 @@ model AnalysisHistory {
   fileHash   String   @map("file_hash") // SHA256 of file content for caching
   language   String
   mode       String   // "concise" | "standard" | "deep_dive"
+  sourceCode String   @map("source_code") @db.Text // Original source code for highlighting
   result     Json     // The full ASTRALIS JSON response
   createdAt  DateTime @default(now()) @map("created_at")
 

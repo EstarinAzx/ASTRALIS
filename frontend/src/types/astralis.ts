@@ -85,6 +85,9 @@ export interface AnalysisResult {
     nodes: FlowNode[];
     edges: FlowEdge[];
 
+    // Original source code for inspector highlighting
+    sourceCode?: string;
+
     // Metadata
     totalLines: number;
     totalSections: number;

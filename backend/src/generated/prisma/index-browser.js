@@ -135,6 +135,7 @@ exports.Prisma.AnalysisHistoryScalarFieldEnum = {
   fileHash: 'fileHash',
   language: 'language',
   mode: 'mode',
+  sourceCode: 'sourceCode',
   result: 'result',
   createdAt: 'createdAt'
 };

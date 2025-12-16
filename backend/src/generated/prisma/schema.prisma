@@ -30,14 +30,15 @@ model User {
 // AnalysisHistory Model - Stores ASTRALIS results per file
 // ============================================================================
 model AnalysisHistory {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  fileName  String   @map("file_name")
-  fileHash  String   @map("file_hash") // SHA256 of file content for caching
-  language  String
-  mode      String // "concise" | "standard" | "deep_dive"
-  result    Json // The full ASTRALIS JSON response
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  fileName   String   @map("file_name")
+  fileHash   String   @map("file_hash") // SHA256 of file content for caching
+  language   String
+  mode       String // "concise" | "standard" | "deep_dive"
+  sourceCode String   @map("source_code") @db.Text // Original source code for highlighting
+  result     Json // The full ASTRALIS JSON response
+  createdAt  DateTime @default(now()) @map("created_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

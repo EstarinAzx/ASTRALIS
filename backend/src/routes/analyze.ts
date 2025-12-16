@@ -55,6 +55,7 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
                     fileName: cached.fileName,
                     language: cached.language,
                     mode: cached.mode,
+                    sourceCode: cached.sourceCode,  // Include source code for inspector
                     result: cached.result,
                     cached: true,
                 },
@@ -76,6 +77,7 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
                 fileHash,
                 language,
                 mode: verbosityMode,
+                sourceCode: code,  // Save original source code for inspector highlighting
                 result: result as object,
             },
         });
@@ -88,6 +90,7 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
                 fileName: analysis.fileName,
                 language: analysis.language,
                 mode: analysis.mode,
+                sourceCode: analysis.sourceCode,  // Return source code for inspector
                 result,
                 cached: false,
             },

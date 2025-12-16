@@ -2070,6 +2070,7 @@ export namespace Prisma {
     fileHash: string | null
     language: string | null
     mode: string | null
+    sourceCode: string | null
     createdAt: Date | null
   }
 
@@ -2080,6 +2081,7 @@ export namespace Prisma {
     fileHash: string | null
     language: string | null
     mode: string | null
+    sourceCode: string | null
     createdAt: Date | null
   }
 
@@ -2090,6 +2092,7 @@ export namespace Prisma {
     fileHash: number
     language: number
     mode: number
+    sourceCode: number
     result: number
     createdAt: number
     _all: number
@@ -2103,6 +2106,7 @@ export namespace Prisma {
     fileHash?: true
     language?: true
     mode?: true
+    sourceCode?: true
     createdAt?: true
   }
 
@@ -2113,6 +2117,7 @@ export namespace Prisma {
     fileHash?: true
     language?: true
     mode?: true
+    sourceCode?: true
     createdAt?: true
   }
 
@@ -2123,6 +2128,7 @@ export namespace Prisma {
     fileHash?: true
     language?: true
     mode?: true
+    sourceCode?: true
     result?: true
     createdAt?: true
     _all?: true
@@ -2207,6 +2213,7 @@ export namespace Prisma {
     fileHash: string
     language: string
     mode: string
+    sourceCode: string
     result: JsonValue
     createdAt: Date
     _count: AnalysisHistoryCountAggregateOutputType | null
@@ -2235,6 +2242,7 @@ export namespace Prisma {
     fileHash?: boolean
     language?: boolean
     mode?: boolean
+    sourceCode?: boolean
     result?: boolean
     createdAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
@@ -2247,6 +2255,7 @@ export namespace Prisma {
     fileHash?: boolean
     language?: boolean
     mode?: boolean
+    sourceCode?: boolean
     result?: boolean
     createdAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
@@ -2259,6 +2268,7 @@ export namespace Prisma {
     fileHash?: boolean
     language?: boolean
     mode?: boolean
+    sourceCode?: boolean
     result?: boolean
     createdAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
@@ -2271,11 +2281,12 @@ export namespace Prisma {
     fileHash?: boolean
     language?: boolean
     mode?: boolean
+    sourceCode?: boolean
     result?: boolean
     createdAt?: boolean
   }
 
-  export type AnalysisHistoryOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "fileName" | "fileHash" | "language" | "mode" | "result" | "createdAt", ExtArgs["result"]["analysisHistory"]>
+  export type AnalysisHistoryOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "fileName" | "fileHash" | "language" | "mode" | "sourceCode" | "result" | "createdAt", ExtArgs["result"]["analysisHistory"]>
   export type AnalysisHistoryInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
   }
@@ -2298,6 +2309,7 @@ export namespace Prisma {
       fileHash: string
       language: string
       mode: string
+      sourceCode: string
       result: Prisma.JsonValue
       createdAt: Date
     }, ExtArgs["result"]["analysisHistory"]>
@@ -2730,6 +2742,7 @@ export namespace Prisma {
     readonly fileHash: FieldRef<"AnalysisHistory", 'String'>
     readonly language: FieldRef<"AnalysisHistory", 'String'>
     readonly mode: FieldRef<"AnalysisHistory", 'String'>
+    readonly sourceCode: FieldRef<"AnalysisHistory", 'String'>
     readonly result: FieldRef<"AnalysisHistory", 'Json'>
     readonly createdAt: FieldRef<"AnalysisHistory", 'DateTime'>
   }
@@ -3178,6 +3191,7 @@ export namespace Prisma {
     fileHash: 'fileHash',
     language: 'language',
     mode: 'mode',
+    sourceCode: 'sourceCode',
     result: 'result',
     createdAt: 'createdAt'
   };
@@ -3346,6 +3360,7 @@ export namespace Prisma {
     fileHash?: StringFilter<"AnalysisHistory"> | string
     language?: StringFilter<"AnalysisHistory"> | string
     mode?: StringFilter<"AnalysisHistory"> | string
+    sourceCode?: StringFilter<"AnalysisHistory"> | string
     result?: JsonFilter<"AnalysisHistory">
     createdAt?: DateTimeFilter<"AnalysisHistory"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
@@ -3358,6 +3373,7 @@ export namespace Prisma {
     fileHash?: SortOrder
     language?: SortOrder
     mode?: SortOrder
+    sourceCode?: SortOrder
     result?: SortOrder
     createdAt?: SortOrder
     user?: UserOrderByWithRelationInput
@@ -3373,6 +3389,7 @@ export namespace Prisma {
     fileHash?: StringFilter<"AnalysisHistory"> | string
     language?: StringFilter<"AnalysisHistory"> | string
     mode?: StringFilter<"AnalysisHistory"> | string
+    sourceCode?: StringFilter<"AnalysisHistory"> | string
     result?: JsonFilter<"AnalysisHistory">
     createdAt?: DateTimeFilter<"AnalysisHistory"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
@@ -3385,6 +3402,7 @@ export namespace Prisma {
     fileHash?: SortOrder
     language?: SortOrder
     mode?: SortOrder
+    sourceCode?: SortOrder
     result?: SortOrder
     createdAt?: SortOrder
     _count?: AnalysisHistoryCountOrderByAggregateInput
@@ -3402,6 +3420,7 @@ export namespace Prisma {
     fileHash?: StringWithAggregatesFilter<"AnalysisHistory"> | string
     language?: StringWithAggregatesFilter<"AnalysisHistory"> | string
     mode?: StringWithAggregatesFilter<"AnalysisHistory"> | string
+    sourceCode?: StringWithAggregatesFilter<"AnalysisHistory"> | string
     result?: JsonWithAggregatesFilter<"AnalysisHistory">
     createdAt?: DateTimeWithAggregatesFilter<"AnalysisHistory"> | Date | string
   }
@@ -3472,6 +3491,7 @@ export namespace Prisma {
     fileHash: string
     language: string
     mode: string
+    sourceCode: string
     result: JsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     user: UserCreateNestedOneWithoutAnalysesInput
@@ -3484,6 +3504,7 @@ export namespace Prisma {
     fileHash: string
     language: string
     mode: string
+    sourceCode: string
     result: JsonNullValueInput | InputJsonValue
     createdAt?: Date | string
   }
@@ -3494,6 +3515,7 @@ export namespace Prisma {
     fileHash?: StringFieldUpdateOperationsInput | string
     language?: StringFieldUpdateOperationsInput | string
     mode?: StringFieldUpdateOperationsInput | string
+    sourceCode?: StringFieldUpdateOperationsInput | string
     result?: JsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutAnalysesNestedInput
@@ -3506,6 +3528,7 @@ export namespace Prisma {
     fileHash?: StringFieldUpdateOperationsInput | string
     language?: StringFieldUpdateOperationsInput | string
     mode?: StringFieldUpdateOperationsInput | string
+    sourceCode?: StringFieldUpdateOperationsInput | string
     result?: JsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -3517,6 +3540,7 @@ export namespace Prisma {
     fileHash: string
     language: string
     mode: string
+    sourceCode: string
     result: JsonNullValueInput | InputJsonValue
     createdAt?: Date | string
   }
@@ -3527,6 +3551,7 @@ export namespace Prisma {
     fileHash?: StringFieldUpdateOperationsInput | string
     language?: StringFieldUpdateOperationsInput | string
     mode?: StringFieldUpdateOperationsInput | string
+    sourceCode?: StringFieldUpdateOperationsInput | string
     result?: JsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -3538,6 +3563,7 @@ export namespace Prisma {
     fileHash?: StringFieldUpdateOperationsInput | string
     language?: StringFieldUpdateOperationsInput | string
     mode?: StringFieldUpdateOperationsInput | string
+    sourceCode?: StringFieldUpdateOperationsInput | string
     result?: JsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -3669,6 +3695,7 @@ export namespace Prisma {
     fileHash?: SortOrder
     language?: SortOrder
     mode?: SortOrder
+    sourceCode?: SortOrder
     result?: SortOrder
     createdAt?: SortOrder
   }
@@ -3680,6 +3707,7 @@ export namespace Prisma {
     fileHash?: SortOrder
     language?: SortOrder
     mode?: SortOrder
+    sourceCode?: SortOrder
     createdAt?: SortOrder
   }
 
@@ -3690,6 +3718,7 @@ export namespace Prisma {
     fileHash?: SortOrder
     language?: SortOrder
     mode?: SortOrder
+    sourceCode?: SortOrder
     createdAt?: SortOrder
   }
   export type JsonWithAggregatesFilter<$PrismaModel = never> =
@@ -3879,6 +3908,7 @@ export namespace Prisma {
     fileHash: string
     language: string
     mode: string
+    sourceCode: string
     result: JsonNullValueInput | InputJsonValue
     createdAt?: Date | string
   }
@@ -3889,6 +3919,7 @@ export namespace Prisma {
     fileHash: string
     language: string
     mode: string
+    sourceCode: string
     result: JsonNullValueInput | InputJsonValue
     createdAt?: Date | string
   }
@@ -3929,6 +3960,7 @@ export namespace Prisma {
     fileHash?: StringFilter<"AnalysisHistory"> | string
     language?: StringFilter<"AnalysisHistory"> | string
     mode?: StringFilter<"AnalysisHistory"> | string
+    sourceCode?: StringFilter<"AnalysisHistory"> | string
     result?: JsonFilter<"AnalysisHistory">
     createdAt?: DateTimeFilter<"AnalysisHistory"> | Date | string
   }
@@ -3987,6 +4019,7 @@ export namespace Prisma {
     fileHash: string
     language: string
     mode: string
+    sourceCode: string
     result: JsonNullValueInput | InputJsonValue
     createdAt?: Date | string
   }
@@ -3997,6 +4030,7 @@ export namespace Prisma {
     fileHash?: StringFieldUpdateOperationsInput | string
     language?: StringFieldUpdateOperationsInput | string
     mode?: StringFieldUpdateOperationsInput | string
+    sourceCode?: StringFieldUpdateOperationsInput | string
     result?: JsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -4007,6 +4041,7 @@ export namespace Prisma {
     fileHash?: StringFieldUpdateOperationsInput | string
     language?: StringFieldUpdateOperationsInput | string
     mode?: StringFieldUpdateOperationsInput | string
+    sourceCode?: StringFieldUpdateOperationsInput | string
     result?: JsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -4017,6 +4052,7 @@ export namespace Prisma {
     fileHash?: StringFieldUpdateOperationsInput | string
     language?: StringFieldUpdateOperationsInput | string
     mode?: StringFieldUpdateOperationsInput | string
+    sourceCode?: StringFieldUpdateOperationsInput | string
     result?: JsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
