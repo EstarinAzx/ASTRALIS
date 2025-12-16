@@ -72,6 +72,7 @@ export interface FlowEdge {
     target: string;
     label?: string;                   // "Yes", "No", etc.
     animated?: boolean;
+    sourceHandle?: string;            // 'yes' or 'no' for diamond nodes
 }
 
 // Complete analysis result

@@ -189,8 +189,10 @@ function convertToReactFlow(
             height: 20,
         },
         // Route from correct handle: Yes = right (green), No = left (red)
-        ...(edge.label === 'Yes' && { sourceHandle: 'yes' }),
-        ...(edge.label === 'No' && { sourceHandle: 'no' }),
+        // Use sourceHandle from edge if provided, otherwise derive from label
+        sourceHandle: edge.sourceHandle ||
+            (edge.label?.toLowerCase() === 'yes' ? 'yes' :
+                edge.label?.toLowerCase() === 'no' ? 'no' : undefined),
     }));
 
     return { nodes, edges };

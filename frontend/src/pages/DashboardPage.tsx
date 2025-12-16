@@ -57,6 +57,8 @@ export function DashboardPage() {
                         ...response.data.result,
                         id: response.data.id,
                         sourceCode: response.data.sourceCode,  // Include source code
+                        nodes: response.data.result.nodes || [], // Ensure array
+                        edges: response.data.result.edges || [], // Ensure array
                     };
                     setResult(analysisResult);
                     // Select first node by default
@@ -220,8 +222,8 @@ export function DashboardPage() {
                 {/* Flowchart */}
                 <div className="flex-1 relative">
                     <FlowchartView
-                        nodes={result.nodes}
-                        edges={result.edges}
+                        nodes={result.nodes || []}
+                        edges={result.edges || []}
                         selectedNode={selectedNode}
                         onNodeSelect={handleNodeSelect}
                     />

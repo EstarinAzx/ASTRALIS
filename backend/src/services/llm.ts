@@ -45,6 +45,7 @@ interface FlowEdge {
     target: string;
     label?: string;
     animated?: boolean;
+    sourceHandle?: string; // 'yes' or 'no' for diamond nodes
 }
 
 interface AnalysisResult {
@@ -113,107 +114,175 @@ B -- No --> D[Error]
  * - !confirm('Delete?') -> "Did user confirm: Delete?"
  * - loading -> "Is loading?"
  * - !user -> "Is user logged in?"
+ * - newPassword !== confirmPassword -> "Do passwords match?"
+ * - !response.ok -> "Did request succeed?"
  */
 function conditionToEnglish(condition: string): string {
     const c = condition.trim();
 
-    // 1. Confirm dialogs: !confirm('...') or !confirm(`...`)
-    const confirmMatch = c.match(/!?confirm\s*\(\s*[`'"](.+?)[`'"]\s*\)/);
-    if (confirmMatch) {
-        const message = confirmMatch[1].replace(/\$\{.*?\}/g, '...'); // Remove template vars
-        return c.startsWith('!')
-            ? `Did user confirm: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"?`
-            : `User confirmed: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"?`;
+    // 1. Comparison operators: a !== b or a === b
+    if (c.includes('!==')) {
+        const parts = c.split('!==').map(p => p.trim());
+        if (parts.length === 2) {
+            const left = parts[0].replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+            const right = parts[1].replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+
+            // Common patterns
+            if (left.includes('password') && right.includes('password')) {
+                return 'Do passwords match?';
+            }
+            if (left.includes('confirm') && right.includes('password')) {
+                return 'Do passwords match?';
+            }
+
+            return `Does ${left} equal ${right}?`;
+        }
     }
 
-    // 2. Negation patterns: !variableName
+    // 2. Optional chaining: user?.id, response?.ok, data?.value
+    const optionalChainMatch = c.match(/^(\w+)\?\.([\w.]+)$/);
+    if (optionalChainMatch) {
+        const obj = optionalChainMatch[1].replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+        const prop = optionalChainMatch[2].replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+
+        if (prop === 'id') return `Does ${obj} ID exist?`;
+        if (prop === 'ok') return `Is ${obj} response OK?`;
+        if (prop.includes('email')) return `Does ${obj} have email?`;
+        if (prop.includes('name')) return `Does ${obj} have name?`;
+
+        return `Does ${obj} have ${prop}?`;
+    }
+
+    // 2b. Object property negation: !response.ok, !data.valid
+    const propNegationMatch = c.match(/^!(\w+)\.(\w+)$/);
+    if (propNegationMatch) {
+        const obj = propNegationMatch[1];
+        const prop = propNegationMatch[2];
+
+        if (prop === 'ok') return 'Did request fail?';
+        if (prop === 'valid') return `Is ${obj} invalid?`;
+        if (prop === 'success') return `Did ${obj} fail?`;
+        if (prop === 'length') return `Is ${obj} empty?`;
+
+        return `Is ${obj}.${prop} false?`;
+    }
+
+    // 2c. Positive object property: response.ok, user.isAdmin
+    const propPositiveMatch = c.match(/^(\w+)\.(\w+)$/);
+    if (propPositiveMatch) {
+        const obj = propPositiveMatch[1].replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+        const prop = propPositiveMatch[2];
+
+        if (prop === 'ok') return 'Is response OK?';
+        if (prop === 'success') return `Did ${obj} succeed?`;
+        if (prop.startsWith('is')) return `Is ${obj} ${prop.replace('is', '').toLowerCase()}?`;
+
+        return `Is ${obj} ${prop}?`;
+    }
+
+    // 3. Confirm dialogs: !confirm('...') or !confirm(`...`)
+    const confirmMatch = c.match(/!?confirm\s*\(\s*[`'"](.+?)[`'"]\s*\)/);
+    if (confirmMatch) {
+        const message = confirmMatch[1].replace(/\$\{.*?\}/g, '...').substring(0, 25);
+        return c.startsWith('!')
+            ? `User declined: "${message}"?`
+            : `User confirmed: "${message}"?`;
+    }
+
+    // 4. Negation patterns: !variableName
     const negationMatch = c.match(/^!(\w+)$/);
     if (negationMatch) {
         const varName = negationMatch[1];
-        // Convert camelCase to readable: editingProduct -> "editing product"
         const readable = varName.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
 
         // Common patterns
+        if (readable === 'token') return 'Is token missing?';
         if (readable.includes('loading')) return 'Is not loading?';
         if (readable.includes('editing')) return `Is not ${readable}?`;
         if (readable.includes('user')) return 'Is user logged out?';
-        if (readable.includes('data')) return 'Is data empty?';
+        if (readable.includes('data')) return 'Is data missing?';
         if (readable.includes('error')) return 'No error?';
         if (readable.includes('valid')) return 'Is invalid?';
+        if (readable.includes('auth')) return 'Not authenticated?';
 
-        return `Is ${readable} false?`;
+        return `Is ${readable} missing?`;
     }
 
-    // 3. Positive check: variableName (without !)
+    // 5. Positive check: variableName (without !)
     const positiveMatch = c.match(/^(\w+)$/);
     if (positiveMatch) {
         const varName = positiveMatch[1];
         const readable = varName.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
 
+        if (readable === 'token') return 'Has valid token?';
         if (readable.includes('loading')) return 'Is loading?';
         if (readable.includes('editing')) return `Is ${readable}?`;
         if (readable.includes('user')) return 'Is user logged in?';
         if (readable.includes('error')) return 'Has error?';
+        if (readable.includes('auth')) return 'Is authenticated?';
 
-        return `Is ${readable}?`;
+        return `Is ${readable} true?`;
     }
 
-    // 4. Method calls: !something.trim() or something.length === 0
+    // 6. Method calls: !something.trim()
     if (c.includes('.trim()')) {
         const varMatch = c.match(/!?(\w+)\.trim\(\)/);
         if (varMatch) {
             const readable = varMatch[1].replace(/([A-Z])/g, ' $1').toLowerCase().trim();
-            return c.startsWith('!') ? `Is ${readable} empty?` : `Is ${readable} not empty?`;
+            return c.startsWith('!') ? `Is ${readable} empty?` : `Is ${readable} provided?`;
         }
     }
 
-    // 5. Comparison: something === null, something !== undefined
+    // 7. Comparison with null/undefined
     if (c.includes('===') || c.includes('!==')) {
-        const parts = c.split(/===|!==/);
+        const parts = c.split(/===|!==/).map(p => p.trim());
         if (parts.length === 2) {
-            const varName = parts[0].trim().replace('!', '');
-            const value = parts[1].trim();
+            const varName = parts[0].replace('!', '');
+            const value = parts[1];
             const readable = varName.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
 
             if (value === 'null' || value === 'undefined') {
                 return c.includes('!==') ? `Does ${readable} exist?` : `Is ${readable} missing?`;
             }
-            return c.includes('!==') ? `Is ${readable} not ${value}?` : `Is ${readable} equal to ${value}?`;
+            if (value === 'true') return `Is ${readable} true?`;
+            if (value === 'false') return `Is ${readable} false?`;
+
+            return c.includes('!==') ? `Is ${readable} different?` : `Is ${readable} equal?`;
         }
     }
 
-    // 6. Array/length checks
+    // 8. Array/length checks
     if (c.includes('.length')) {
         const varMatch = c.match(/(\w+)\.length/);
         if (varMatch) {
             const readable = varMatch[1].replace(/([A-Z])/g, ' $1').toLowerCase().trim();
-            if (c.includes('=== 0') || c.includes('< 1')) return `Is ${readable} empty?`;
-            if (c.includes('> 0') || c.includes('>= 1')) return `Does ${readable} have items?`;
-            return `Check ${readable} length?`;
+            if (c.includes('=== 0') || c.includes('< 1') || c.startsWith('!')) return `Is ${readable} empty?`;
+            if (c.includes('> 0') || c.includes('>= 1')) return `Has ${readable}?`;
+            return `Check ${readable} count?`;
         }
     }
 
-    // 7. Complex conditions - simplify
+    // 9. Complex conditions - simplify
     if (c.length > 40) {
-        // Extract first meaningful part
         const firstPart = c.split(/&&|\|\|/)[0].trim();
         if (firstPart !== c) {
-            return conditionToEnglish(firstPart) + ' (+ more)';
+            return conditionToEnglish(firstPart) + ' (+more)';
         }
     }
 
-    // 8. Default: Clean up and make readable
+    // 10. Default: Clean up and make readable
     let readable = c
         .replace(/!/g, 'not ')
         .replace(/&&/g, ' and ')
         .replace(/\|\|/g, ' or ')
+        .replace(/\./g, ' ')
         .replace(/([A-Z])/g, ' $1')
         .toLowerCase()
+        .replace(/\s+/g, ' ')
         .trim();
 
-    // Truncate if too long
-    if (readable.length > 35) {
-        readable = readable.substring(0, 32) + '...';
+    if (readable.length > 30) {
+        readable = readable.substring(0, 27) + '...';
     }
 
     return readable.charAt(0).toUpperCase() + readable.slice(1) + '?';
@@ -367,6 +436,12 @@ ${code}
         const parsed = JSON.parse(content) as AnalysisResult;
         console.log('✅ LLM parsed successfully with', parsed.nodes?.length || 0, 'nodes');
 
+        // CRITICAL: If LLM returns 0 nodes, fallback to mock parser immediately
+        if (!parsed.nodes || parsed.nodes.length === 0) {
+            console.log('⚠️ LLM returned 0 nodes, falling back to mock parser');
+            return generateMockResponse(fileName, language, code);
+        }
+
         // 1. GAP VALIDATION (Mathematical)
         console.log('🛡️ Step 1: Running Gap Validator...');
         const gapFilled = validateAndFillGaps(parsed, code, fileName, language);
@@ -374,6 +449,12 @@ ${code}
         // 2. VERIFIER AGENT (LLM Audit)
         console.log('🕵️ Step 2: Running Verifier Agent...');
         const verified = await verifyFlowWithLLM(gapFilled, code, fileName, language);
+
+        // FINAL CHECK: If verification returns 0 nodes, fallback to mock parser
+        if (!verified.nodes || verified.nodes.length === 0) {
+            console.log('⚠️ Verification returned 0 nodes, falling back to mock parser');
+            return generateMockResponse(fileName, language, code);
+        }
 
         return verified;
     } catch (error) {
@@ -517,8 +598,19 @@ function validateAndFillGaps(
     language: string
 ): AnalysisResult {
     const totalLines = code.split('\n').length;
+
+    // Safety check: if nodes is undefined or not an array, return empty result
+    if (!result.nodes || !Array.isArray(result.nodes)) {
+        console.log('⚠️ validateAndFillGaps: nodes is undefined or not an array, skipping');
+        return {
+            ...result,
+            nodes: result.nodes || [],
+            edges: result.edges || [],
+        };
+    }
+
     let nodes = [...result.nodes];
-    const edges = [...result.edges];
+    const edges = [...(result.edges || [])];
 
     // 1. Force Sort by lineStart
     nodes.sort((a, b) => (a.lineStart || 0) - (b.lineStart || 0));
@@ -905,7 +997,7 @@ function generateMockResponse(fileName: string, language: string, code: string):
                     codeRef: 'useEffect(() => {...})',
                 }],
             });
-            i = j - 1;
+            // i = j - 1;  // REMOVED: Allow parsing of code inside useEffect
         }
     }
 
@@ -943,7 +1035,7 @@ function generateMockResponse(fileName: string, language: string, code: string):
                     codeRef: `async function ${name}`,
                 }],
             });
-            i = j - 1;
+            // i = j - 1;  // REMOVED: Allow parsing of code inside async function
         }
     }
 
@@ -989,7 +1081,7 @@ function generateMockResponse(fileName: string, language: string, code: string):
                     codeRef: `const ${name} = async () => {...}`,
                 }],
             });
-            i = j - 1;
+            // i = j - 1;  // REMOVED: Allow parsing of code inside the function
         }
     }
 
@@ -1054,11 +1146,13 @@ function generateMockResponse(fileName: string, language: string, code: string):
                     codeRef: `const ${name} = (...) => {...}`,
                 }],
             });
-            i = endLine - 1;
+            // i = endLine - 1;  // REMOVED: Allow parsing of code inside the function
         }
     }
 
-    // Find guard clauses (if ... return) and other conditionals
+    // Find guard clauses (if ... return) and other conditionals with PROPER BRANCHING
+    const decisionNodes: { nodeId: string; yesNodeId: string | null; noNodeId: string | null; endLine: number }[] = [];
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
 
@@ -1071,11 +1165,14 @@ function generateMockResponse(fileName: string, language: string, code: string):
 
         const condition = ifMatch[1];
         const readableLabel = conditionToEnglish(condition);
-        const isGuard = line.includes('return');
+        const hasReturn = line.includes('return') || false;
 
         // Find the end of this if block
-        let endLine = i + 1;
-        if (line.includes('{') && !line.includes('}')) {
+        let ifBlockStart = i;
+        let ifBlockEnd = i + 1;
+        let ifBlockContent = '';
+
+        if (line.includes('{')) {
             let braces = 0;
             let j = i;
             do {
@@ -1083,38 +1180,204 @@ function generateMockResponse(fileName: string, language: string, code: string):
                 braces -= (lines[j].match(/}/g) || []).length;
                 j++;
             } while (braces > 0 && j < lines.length);
-            endLine = j;
+            ifBlockEnd = j;
+
+            // Extract what's inside the if block
+            const blockLines = lines.slice(i + 1, ifBlockEnd - 1);
+            ifBlockContent = blockLines.map(l => l.trim()).filter(l => l && !l.startsWith('//')).join('\n');
         }
 
+        // Check if there's a return inside (making it a guard)
+        const blockHasReturn = ifBlockContent.includes('return');
+        const isGuard = hasReturn || blockHasReturn;
+
+        // Create the DECISION node (diamond)
         nodeId++;
+        const decisionId = `n${nodeId}`;
+
         addNode({
-            id: `n${nodeId}`,
+            id: decisionId,
             label: readableLabel,
             subtitle: isGuard ? 'Guard Clause' : 'Decision',
             shape: 'diamond',
             color: isGuard ? 'red' : 'orange',
             isDecision: true,
             condition: readableLabel,
-            yesTarget: isGuard ? 'Early exit' : undefined,
-            noTarget: isGuard ? 'Continue' : undefined,
             narrative: isGuard
-                ? `Guard clause that checks: ${readableLabel}. If true, returns early.`
+                ? `Guard clause: ${readableLabel}. If YES, exits early.`
                 : `Decision point: ${readableLabel}`,
-            codeSnippet: lines.slice(i, Math.min(i + 3, endLine)).join('\n'),
+            codeSnippet: line.trim(),
             lineStart: i + 1,
-            lineEnd: endLine,
+            lineEnd: Math.min(i + 5, ifBlockEnd), // Cover first few lines of the if block
             logicTable: [{
                 step: '1',
-                trigger: isGuard ? 'Before render' : 'Logic flow',
+                trigger: 'Condition check',
                 action: readableLabel,
-                output: isGuard ? 'Return or continue' : 'Branch',
+                output: 'Yes or No',
                 codeRef: line.trim().substring(0, 60),
                 lineStart: i + 1,
-                lineEnd: endLine,
+                lineEnd: Math.min(i + 5, ifBlockEnd),
             }],
         });
 
-        i = endLine - 1;
+        // Create the YES branch node (what happens when condition is TRUE)
+        let yesNodeId: string | null = null;
+        if (ifBlockContent.trim()) {
+            nodeId++;
+            yesNodeId = `n${nodeId}`;
+
+            // Determine what the yes branch does
+            let yesLabel = 'Execute Block';
+            let yesColor: SectionColor = 'blue';
+
+            if (blockHasReturn) {
+                // Check what it returns
+                if (ifBlockContent.includes('setError') || ifBlockContent.includes('error')) {
+                    yesLabel = 'Set Error & Return';
+                    yesColor = 'red';
+                } else if (ifBlockContent.includes('null') || ifBlockContent.includes('undefined')) {
+                    yesLabel = 'Return Null';
+                    yesColor = 'red';
+                } else if (ifBlockContent.includes('<')) {
+                    yesLabel = 'Return Early JSX';
+                    yesColor = 'cyan';
+                } else {
+                    yesLabel = 'Early Return';
+                    yesColor = 'red';
+                }
+            } else if (ifBlockContent.includes('set')) {
+                yesLabel = 'Update State';
+                yesColor = 'green';
+            } else if (ifBlockContent.includes('navigate') || ifBlockContent.includes('redirect')) {
+                yesLabel = 'Navigate Away';
+                yesColor = 'purple';
+            }
+
+            addNode({
+                id: yesNodeId,
+                label: yesLabel,
+                subtitle: blockHasReturn ? 'Early Exit' : 'If True',
+                shape: blockHasReturn ? 'rounded' : 'rectangle',
+                color: yesColor,
+                narrative: `When "${readableLabel}" is YES: ${yesLabel}`,
+                codeSnippet: ifBlockContent.substring(0, 200),
+                lineStart: i + 2, // Start from line after if
+                lineEnd: Math.max(i + 2, ifBlockEnd - 1), // Content lines only
+                logicTable: [{
+                    step: '1',
+                    trigger: `${readableLabel} = YES`,
+                    action: yesLabel,
+                    output: blockHasReturn ? 'Exit function' : 'Continue',
+                    codeRef: ifBlockContent.substring(0, 50),
+                    lineStart: i + 2,
+                    lineEnd: Math.max(i + 2, ifBlockEnd - 1),
+                }],
+            });
+
+            // Add YES edge from decision to yes-branch
+            edges.push({
+                id: `e_${decisionId}_yes`,
+                source: decisionId,
+                target: yesNodeId,
+                sourceHandle: 'yes', // Connect from right (green) handle
+                label: 'YES',
+                animated: true,
+            });
+        }
+
+        // Create a NO continuation node for code after the if-block
+        // Find the next meaningful line after ifBlockEnd
+        let noLineStart = ifBlockEnd;
+        while (noLineStart < lines.length && lines[noLineStart].trim() === '') {
+            noLineStart++; // Skip empty lines
+        }
+
+        if (noLineStart < lines.length) {
+            const noLine = lines[noLineStart].trim();
+
+            // Only create NO node if there's actual code (not just closing braces or catch)
+            if (noLine && !noLine.startsWith('}') && !noLine.startsWith('catch') && !noLine.startsWith('finally')) {
+                // Check if this line already has a node
+                if (!nodes.some(n => n.lineStart === noLineStart + 1)) {
+                    nodeId++;
+                    const noNodeId = `n${nodeId}`;
+
+                    // Determine what the NO path does
+                    let noLabel = 'Continue';
+                    let noColor: SectionColor = 'green';
+
+                    // Calculate the end line for multi-line statements
+                    let noLineEnd = noLineStart;
+
+                    // For return statements with parentheses (JSX), find the matching close paren
+                    if (noLine.includes('return (') || noLine.includes('return(')) {
+                        let parens = 0;
+                        let k = noLineStart;
+                        do {
+                            parens += (lines[k].match(/\(/g) || []).length;
+                            parens -= (lines[k].match(/\)/g) || []).length;
+                            k++;
+                        } while (parens > 0 && k < lines.length);
+                        noLineEnd = k - 1; // Include the line with closing paren
+                        noLabel = 'RENDER';
+                        noColor = 'cyan';
+                    } else if (noLine.includes('set')) {
+                        noLabel = 'Update State';
+                        noColor = 'green';
+                    } else if (noLine.includes('navigate') || noLine.includes('redirect')) {
+                        noLabel = 'Navigate';
+                        noColor = 'purple';
+                    } else if (noLine.includes('console')) {
+                        noLabel = 'Log Output';
+                        noColor = 'blue';
+                    } else if (noLine.includes('return')) {
+                        noLabel = 'Return';
+                        noColor = 'cyan';
+                    }
+
+                    addNode({
+                        id: noNodeId,
+                        label: noLabel,
+                        subtitle: 'If False (NO path)',
+                        shape: noLabel === 'RENDER' ? 'rounded' : 'rectangle',
+                        color: noColor,
+                        narrative: `When "${readableLabel}" is NO: ${noLabel}`,
+                        codeSnippet: lines.slice(noLineStart, Math.min(noLineStart + 8, noLineEnd + 1)).join('\n'),
+                        lineStart: noLineStart + 1,
+                        lineEnd: noLineEnd + 1,
+                        logicTable: [{
+                            step: '1',
+                            trigger: `${readableLabel} = NO`,
+                            action: noLabel,
+                            output: 'Continue',
+                            codeRef: noLine.substring(0, 50),
+                            lineStart: noLineStart + 1,
+                            lineEnd: noLineEnd + 1,
+                        }],
+                    });
+
+                    // Add NO edge from decision to NO continuation
+                    edges.push({
+                        id: `e_${decisionId}_no`,
+                        source: decisionId,
+                        target: noNodeId,
+                        sourceHandle: 'no', // Connect from left (red) handle
+                        label: 'NO',
+                        animated: false,
+                    });
+                }
+            }
+        }
+
+        // Track for NO edge (will connect to next node after if block)
+        decisionNodes.push({
+            nodeId: decisionId,
+            yesNodeId,
+            noNodeId: null, // Will be filled later
+            endLine: ifBlockEnd,
+        });
+
+        i = ifBlockEnd - 1;
     }
 
     // Find main return (JSX)
@@ -1170,22 +1433,82 @@ function generateMockResponse(fileName: string, language: string, code: string):
         }
     }
 
-    // 3. Rebuild edges to connect nodes in order
-    const finalEdges: FlowEdge[] = [];
+    // 3. Preserve edges we already created (YES branches) and add NO branches + sequential edges
+    const finalEdges: FlowEdge[] = [...edges]; // Keep existing YES edges
+    const edgeSet = new Set(edges.map(e => `${e.source}->${e.target}`));
+
+    // Build a map of node id -> node for quick lookup
+    const nodeMap = new Map(uniqueNodes.map(n => [n.id, n]));
+
+    // Find all decision nodes that need NO edges
+    const decisionNodeIds = new Set(uniqueNodes.filter(n => n.isDecision).map(n => n.id));
+
+    // Find all "yes branch" nodes (Early Exit nodes that shouldn't continue)
+    const yesNodeIds = new Set(edges.filter(e => e.label === 'YES').map(e => e.target));
+
     for (let i = 0; i < uniqueNodes.length - 1; i++) {
         const current = uniqueNodes[i];
         const next = uniqueNodes[i + 1];
+        const edgeKey = `${current.id}->${next.id}`;
 
-        // Skip adding edge if current node ends way before next starts (might be different branches)
-        const gap = (next.lineStart || 0) - (current.lineEnd || 0);
+        // Skip if edge already exists
+        if (edgeSet.has(edgeKey)) continue;
 
-        finalEdges.push({
-            id: `e_${current.id}_${next.id}`,
-            source: current.id,
-            target: next.id,
-            animated: current.isDecision, // Animate decision edges
-            label: current.isDecision ? 'then' : undefined,
-        });
+        // Skip if current is a "yes branch" node (early exit) - it doesn't continue
+        if (yesNodeIds.has(current.id) && current.subtitle?.includes('Early Exit')) {
+            continue;
+        }
+
+        // If current is a decision node, we need BOTH YES and NO edges
+        if (current.isDecision) {
+            const yesEdge = edges.find(e => e.source === current.id && e.label === 'YES');
+
+            if (yesEdge && yesEdge.target === next.id) {
+                // Next is the YES branch - find the node AFTER yes branch for NO
+                // The NO branch should go to the node that comes after the yes-branch node
+                const yesNode = nodeMap.get(yesEdge.target);
+                if (yesNode) {
+                    // Find the next node after the yes-branch (by line number)
+                    const noTarget = uniqueNodes.find(n =>
+                        (n.lineStart || 0) > (yesNode.lineEnd || yesNode.lineStart || 0) &&
+                        n.id !== yesNode.id
+                    );
+                    if (noTarget) {
+                        const noEdgeKey = `${current.id}->${noTarget.id}`;
+                        if (!edgeSet.has(noEdgeKey)) {
+                            finalEdges.push({
+                                id: `e_${current.id}_no`,
+                                source: current.id,
+                                target: noTarget.id,
+                                sourceHandle: 'no',
+                                label: 'NO',
+                                animated: false,
+                            });
+                            edgeSet.add(noEdgeKey);
+                        }
+                    }
+                }
+            } else {
+                // Next is NOT the yes branch, so this becomes the NO edge
+                finalEdges.push({
+                    id: `e_${current.id}_no`,
+                    source: current.id,
+                    target: next.id,
+                    sourceHandle: 'no',
+                    label: 'NO',
+                    animated: false,
+                });
+                edgeSet.add(edgeKey);
+            }
+        } else {
+            // Regular sequential edge
+            finalEdges.push({
+                id: `e_${current.id}_${next.id}`,
+                source: current.id,
+                target: next.id,
+            });
+            edgeSet.add(edgeKey);
+        }
     }
 
     console.log(`📊 Mock parser: ${uniqueNodes.length} nodes, ${finalEdges.length} edges`);
