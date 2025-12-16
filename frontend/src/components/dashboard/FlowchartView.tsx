@@ -27,7 +27,7 @@ interface Props {
 }
 
 // ============================================================================
-// Smart Hierarchical Layout Algorithm
+// Smart Hierarchical Layout Algorithm (with lineStart fallback)
 // ============================================================================
 function calculateHierarchicalLayout(
     nodes: FlowNode[],
@@ -36,6 +36,12 @@ function calculateHierarchicalLayout(
     const positions = new Map<string, { x: number; y: number }>();
 
     if (nodes.length === 0) return positions;
+
+    // Build node lookup with lineStart
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+    // Sort nodes by lineStart to establish natural order
+    const sortedNodes = [...nodes].sort((a, b) => (a.lineStart || 0) - (b.lineStart || 0));
 
     // Build adjacency map
     const children = new Map<string, string[]>();
@@ -49,54 +55,64 @@ function calculateHierarchicalLayout(
         parents.get(edge.target)!.push(edge.source);
     });
 
-    // Find root nodes (no parents)
-    const nodeIds = new Set(nodes.map(n => n.id));
-    const roots = nodes.filter(n => !parents.has(n.id) || parents.get(n.id)!.length === 0);
+    // Assign levels based on edges AND lineStart fallback
+    const levels = new Map<string, number>();
+    const processed = new Set<string>();
 
-    // If no roots found, use first node
-    if (roots.length === 0 && nodes.length > 0) {
-        roots.push(nodes[0]);
+    // Process connected nodes via BFS from roots
+    const roots = sortedNodes.filter(n => !parents.has(n.id) || parents.get(n.id)!.length === 0);
+    if (roots.length === 0 && sortedNodes.length > 0) {
+        roots.push(sortedNodes[0]);
     }
 
-    // BFS to assign levels
-    const levels = new Map<string, number>();
-    const queue: { id: string; level: number }[] = roots.map(r => ({ id: r.id, level: 0 }));
-    const visited = new Set<string>();
+    const queue: { id: string; level: number }[] = roots.map((r, i) => ({ id: r.id, level: i }));
 
     while (queue.length > 0) {
         const { id, level } = queue.shift()!;
-        if (visited.has(id)) continue;
-        visited.add(id);
-
-        levels.set(id, Math.max(level, levels.get(id) || 0));
+        if (processed.has(id)) continue;
+        processed.add(id);
+        levels.set(id, level);
 
         const childIds = children.get(id) || [];
         childIds.forEach(childId => {
-            if (nodeIds.has(childId)) {
+            if (nodeMap.has(childId) && !processed.has(childId)) {
                 queue.push({ id: childId, level: level + 1 });
             }
         });
     }
 
-    // Handle unvisited nodes (disconnected)
-    nodes.forEach(node => {
+    // Handle disconnected nodes - assign level based on lineStart position
+    let maxLevel = Math.max(...Array.from(levels.values()), 0);
+    sortedNodes.forEach((node, sortIndex) => {
         if (!levels.has(node.id)) {
-            levels.set(node.id, 0);
+            // Use position in sorted array as level indicator
+            // Scale to avoid gaps - place proportionally
+            const proportionalLevel = Math.floor((sortIndex / sortedNodes.length) * (maxLevel + 2));
+            levels.set(node.id, proportionalLevel);
         }
     });
 
-    // Group nodes by level
+    // Re-sort levels to ensure lineStart order within same level
     const levelGroups = new Map<number, string[]>();
     levels.forEach((level, nodeId) => {
         if (!levelGroups.has(level)) levelGroups.set(level, []);
         levelGroups.get(level)!.push(nodeId);
     });
 
-    // Position nodes
+    // Sort nodes within each level by lineStart
+    levelGroups.forEach((nodeIds, _level) => {
+        nodeIds.sort((a, b) => {
+            const nodeA = nodeMap.get(a);
+            const nodeB = nodeMap.get(b);
+            return ((nodeA?.lineStart || 0) - (nodeB?.lineStart || 0));
+        });
+    });
+
+    // Position nodes - wider horizontal spacing for better branch separation
     const nodeWidth = 220;
     const nodeHeight = 120;
-    const horizontalSpacing = 80;
-    const verticalSpacing = 140;
+    const horizontalSpacing = 150;  // Increased from 80 for better decision branch spread
+    const verticalSpacing = 160;    // Slightly increased for clarity
 
     levelGroups.forEach((nodeIds, level) => {
         const totalWidth = nodeIds.length * nodeWidth + (nodeIds.length - 1) * horizontalSpacing;
@@ -172,6 +188,9 @@ function convertToReactFlow(
             width: 20,
             height: 20,
         },
+        // Route from correct handle: Yes = right (green), No = left (red)
+        ...(edge.label === 'Yes' && { sourceHandle: 'yes' }),
+        ...(edge.label === 'No' && { sourceHandle: 'no' }),
     }));
 
     return { nodes, edges };
@@ -181,24 +200,34 @@ function convertToReactFlow(
 // Component
 // ============================================================================
 export function FlowchartView({ nodes: flowNodes, edges: flowEdges, selectedNode, onNodeSelect }: Props) {
+    // Only recalculate on actual data change (not selection change)
     const { nodes: initialNodes, edges: initialEdges } = useMemo(
-        () => convertToReactFlow(flowNodes, flowEdges, selectedNode?.id ?? null),
-        [flowNodes, flowEdges, selectedNode]
+        () => convertToReactFlow(flowNodes, flowEdges, null),
+        [flowNodes, flowEdges]  // Removed selectedNode - positions shouldn't change on select
     );
 
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-    // Update when data changes
+    // Only reset positions when raw data changes (not on selection)
     useEffect(() => {
-        const { nodes: newNodes, edges: newEdges } = convertToReactFlow(
-            flowNodes,
-            flowEdges,
-            selectedNode?.id ?? null
-        );
+        const { nodes: newNodes, edges: newEdges } = convertToReactFlow(flowNodes, flowEdges, null);
         setNodes(newNodes);
         setEdges(newEdges);
-    }, [flowNodes, flowEdges, selectedNode, setNodes, setEdges]);
+    }, [flowNodes, flowEdges, setNodes, setEdges]);  // Removed selectedNode!
+
+    // Update selection highlighting WITHOUT resetting positions
+    useEffect(() => {
+        setNodes(currentNodes =>
+            currentNodes.map(node => ({
+                ...node,
+                data: {
+                    ...node.data,
+                    isSelected: node.id === selectedNode?.id
+                }
+            }))
+        );
+    }, [selectedNode, setNodes]);
 
     // Handle node click
     const onNodeClick: NodeMouseHandler = useCallback(

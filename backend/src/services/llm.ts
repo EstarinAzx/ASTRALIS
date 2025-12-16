@@ -105,7 +105,7 @@ RESPOND WITH ONLY VALID JSON:
       "shape": "rectangle|diamond|rounded|hexagon",
       "color": "blue|green|orange|purple|red|cyan",
       "narrative": "Plain English explanation of what this code section does and why",
-      "codeSnippet": "The actual code this node represents",
+      "codeSnippet": "FULL source code - NO abbreviation like {...} or ... - include COMPLETE code",
       "lineStart": 1,
       "lineEnd": 10,
       "isDecision": true/false,
@@ -167,6 +167,18 @@ COLORS:
 - "red" = Error handling, catch blocks, failures
 - "cyan" = Render output, return JSX
 
+⚠️ SEQUENTIAL FLOW RULE - VERY IMPORTANT:
+- Nodes MUST be connected in LINE ORDER (top to bottom of file)
+- First node (imports) at lineStart 1
+- Each node connects to the next node in the file
+- Even if code blocks seem independent, they have reading order
+- Node with lineStart 1-10 → connects to → Node with lineStart 11-20 → etc.
+- NO ORPHAN NODES - every node must have incoming edge (except first)
+- Exception: Decision branches (Yes/No paths that merge later)
+
+EXAMPLE: If your nodes are ordered by lineStart as: A(1-5), B(8-15), C(20-30), D(35-50)
+Then edges MUST include: A→B, B→C, C→D (plus any decision branches)
+
 FLOW PATTERN FOR REACT COMPONENTS:
 1. Component mounts → Create state → Check/restore saved data
 2. Decision: Data found? → Yes: use it, No: handle missing
@@ -188,12 +200,20 @@ CRITICAL COVERAGE REQUIREMENT:
 - Include: imports, interfaces, types, function signatures, hooks, conditionals, returns, everything
 - When grouping, use lineStart of first line and lineEnd of last line in the group
 
+CODE SNIPPET RULES:
+- codeSnippet MUST contain the COMPLETE source code for that node
+- NEVER abbreviate with {...} or ... or [truncated]
+- For interfaces: include ALL properties, even nested ones
+- For functions: include the FULL function body
+- If code is long, that's OK - include it all
+
 VERIFICATION: Before responding, verify:
 □ First node starts at line 1
 □ Last node ends at the final line
 □ No line numbers are skipped between nodes
 □ Every interface has its properties in a logic table
 □ Every function/method is represented
+□ codeSnippet contains FULL code, not abbreviated
 
 REMEMBER: The goal is COMPLETE coverage - every single piece of code must be visualized.`;
 }
