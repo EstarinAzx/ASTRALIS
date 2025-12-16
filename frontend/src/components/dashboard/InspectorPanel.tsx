@@ -1,8 +1,8 @@
 // ============================================================================
-// Inspector Panel - Logic Table Display
+// Inspector Panel - Logic Table Display (with null checks)
 // ============================================================================
 
-import { Code2, Table2, FileText, Box } from 'lucide-react';
+import { Code2, Table2, FileText, Box, AlertCircle } from 'lucide-react';
 import type { FlowNode, SectionColor } from '../../types/astralis';
 
 interface Props {
@@ -32,7 +32,13 @@ export function InspectorPanel({ node }: Props) {
         );
     }
 
-    const colors = colorConfig[node.color];
+    // Safe access with defaults
+    const colors = colorConfig[node.color] || colorConfig.blue;
+    const logicTable = node.logicTable || [];
+    const narrative = node.narrative || 'No description available for this node.';
+    const codeSnippet = node.codeSnippet || '// No code snippet available';
+    const lineStart = node.lineStart || 0;
+    const lineEnd = node.lineEnd || 0;
 
     return (
         <aside className="w-96 border-l border-[var(--border-color)] bg-[var(--bg-card)] overflow-auto">
@@ -51,7 +57,7 @@ export function InspectorPanel({ node }: Props) {
                     </span>
                 </div>
                 <div className="font-semibold" style={{ color: colors.text }}>
-                    {node.label}
+                    {node.label || 'Unnamed Node'}
                 </div>
                 {node.subtitle && (
                     <div className="text-sm text-[var(--text-secondary)] mt-0.5">
@@ -67,7 +73,7 @@ export function InspectorPanel({ node }: Props) {
                     <span className="font-medium text-[var(--text-primary)] text-sm">Narrative</span>
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                    {node.narrative}
+                    {narrative}
                 </p>
             </div>
 
@@ -77,39 +83,46 @@ export function InspectorPanel({ node }: Props) {
                     <Table2 className="w-4 h-4" style={{ color: colors.text }} />
                     <span className="font-medium text-[var(--text-primary)] text-sm">Logic Table</span>
                     <span className="ml-auto text-xs text-[var(--text-muted)]">
-                        {node.logicTable.length} step{node.logicTable.length !== 1 ? 's' : ''}
+                        {logicTable.length} step{logicTable.length !== 1 ? 's' : ''}
                     </span>
                 </div>
 
-                <div className="rounded-lg border border-[var(--border-color)] overflow-hidden">
-                    <table className="w-full text-xs">
-                        <thead>
-                            <tr className="bg-[var(--bg-tertiary)]">
-                                <th className="px-2 py-2 text-left text-[var(--text-muted)] font-medium w-10">Step</th>
-                                <th className="px-2 py-2 text-left text-[var(--text-muted)] font-medium">Trigger</th>
-                                <th className="px-2 py-2 text-left text-[var(--text-muted)] font-medium">Action</th>
-                                <th className="px-2 py-2 text-left text-[var(--text-muted)] font-medium">Output</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {node.logicTable.map((step, i) => (
-                                <tr key={i} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-tertiary)]/50">
-                                    <td className="px-2 py-2 font-mono text-[var(--text-muted)]">{step.step}</td>
-                                    <td className="px-2 py-2 text-[var(--text-secondary)]">{step.trigger}</td>
-                                    <td className="px-2 py-2 text-[var(--text-secondary)]">
-                                        {step.action}
-                                        {step.codeRef && (
-                                            <code className="ml-1 px-1 py-0.5 rounded text-[10px] bg-[var(--bg-tertiary)]" style={{ color: colors.text }}>
-                                                {step.codeRef}
-                                            </code>
-                                        )}
-                                    </td>
-                                    <td className="px-2 py-2 text-[var(--text-secondary)]">{step.output}</td>
+                {logicTable.length > 0 ? (
+                    <div className="rounded-lg border border-[var(--border-color)] overflow-hidden">
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="bg-[var(--bg-tertiary)]">
+                                    <th className="px-2 py-2 text-left text-[var(--text-muted)] font-medium w-10">Step</th>
+                                    <th className="px-2 py-2 text-left text-[var(--text-muted)] font-medium">Trigger</th>
+                                    <th className="px-2 py-2 text-left text-[var(--text-muted)] font-medium">Action</th>
+                                    <th className="px-2 py-2 text-left text-[var(--text-muted)] font-medium">Output</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {logicTable.map((step, i) => (
+                                    <tr key={i} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-tertiary)]/50">
+                                        <td className="px-2 py-2 font-mono text-[var(--text-muted)]">{step.step || i + 1}</td>
+                                        <td className="px-2 py-2 text-[var(--text-secondary)]">{step.trigger || '-'}</td>
+                                        <td className="px-2 py-2 text-[var(--text-secondary)]">
+                                            {step.action || '-'}
+                                            {step.codeRef && (
+                                                <code className="ml-1 px-1 py-0.5 rounded text-[10px] bg-[var(--bg-tertiary)]" style={{ color: colors.text }}>
+                                                    {step.codeRef}
+                                                </code>
+                                            )}
+                                        </td>
+                                        <td className="px-2 py-2 text-[var(--text-secondary)]">{step.output || '-'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="text-center py-6 text-[var(--text-muted)]">
+                        <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No logic steps defined for this node</p>
+                    </div>
+                )}
             </div>
 
             {/* Source Code */}
@@ -119,14 +132,16 @@ export function InspectorPanel({ node }: Props) {
                         <Code2 className="w-4 h-4 text-[var(--text-muted)]" />
                         <span className="font-medium text-[var(--text-primary)] text-sm">Source Code</span>
                     </div>
-                    <span className="text-xs text-[var(--text-muted)]">
-                        Lines {node.lineStart}-{node.lineEnd}
-                    </span>
+                    {lineStart > 0 && lineEnd > 0 && (
+                        <span className="text-xs text-[var(--text-muted)]">
+                            Lines {lineStart}-{lineEnd}
+                        </span>
+                    )}
                 </div>
 
                 <pre className="p-3 rounded-lg bg-[#0d0d14] border border-[var(--border-color)] text-xs font-mono overflow-x-auto max-h-48">
                     <code className="text-[var(--text-secondary)] whitespace-pre">
-                        {node.codeSnippet || '// No code snippet available'}
+                        {codeSnippet}
                     </code>
                 </pre>
             </div>

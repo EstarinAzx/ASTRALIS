@@ -131,16 +131,27 @@ RESPOND WITH ONLY VALID JSON:
   ]
 }
 
-CRITICAL EDGE RULES:
-1. EVERY node (except the last) must have at least one outgoing edge
-2. Edges must form a connected graph - no isolated nodes!
-3. For decision nodes (diamonds):
-   - MUST have exactly 2 outgoing edges
-   - One labeled "Yes", one labeled "No"
-   - Yes = positive/success path, No = negative/error path
-4. For regular nodes: edge to the next logical step (no label needed)
-5. Edge "source" = where arrow starts, "target" = where arrow points
-6. Use sequential IDs: e1, e2, e3, etc.
+⚠️ CRITICAL EDGE RULES - FOLLOW EXACTLY:
+
+1. EVERY node (except final render) MUST have outgoing edge(s)
+
+2. DECISION NODES (shape: "diamond") - MANDATORY:
+   ✅ MUST have EXACTLY 2 outgoing edges - one "Yes", one "No"
+   ✅ Example for a decision "Is response OK?":
+      { "id": "e5", "source": "check_response", "target": "handle_success", "label": "Yes" },
+      { "id": "e6", "source": "check_response", "target": "handle_error", "label": "No" }
+   ❌ WRONG: Only having one edge from a diamond
+   ❌ WRONG: Diamond with no "No" edge
+   
+3. Create ERROR/FAILURE nodes for "No" branches:
+   - Every "No" edge must point to an error handling node (color: "red")
+   - Example: "Show validation error", "Handle API failure", "Display error message"
+
+4. Regular nodes: one edge to next step (no label)
+
+5. Edges must form CONNECTED graph - no orphan nodes!
+
+6. Count check: If you have N decision diamonds, you MUST have 2N edges from them (N "Yes" + N "No")
 
 SHAPES:
 - "rectangle" = State, definitions, assignments, setup steps
