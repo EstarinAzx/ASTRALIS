@@ -210,6 +210,21 @@ function generateMockResponse(fileName: string, language: string, code: string):
     const lines = code.split('\n');
     const lineCount = lines.length;
 
+    // Helper: extract meaningful code lines (skip comments and empty lines)
+    const getCodeSnippet = (startLine: number, endLine: number): string => {
+        const snippet = lines.slice(startLine, endLine);
+        // Find first non-comment, non-empty line
+        const filtered = snippet.filter(line => {
+            const trimmed = line.trim();
+            return trimmed && !trimmed.startsWith('//') && !trimmed.startsWith('#') && !trimmed.startsWith('/*');
+        });
+        return filtered.slice(0, 8).join('\n') || snippet.slice(0, 5).join('\n');
+    };
+
+    // Extract first meaningful code section
+    const codePreview = getCodeSnippet(0, Math.min(30, lineCount));
+    const midSection = getCodeSnippet(Math.floor(lineCount / 3), Math.floor(lineCount / 2));
+
     return {
         fileName,
         language,
@@ -218,12 +233,12 @@ function generateMockResponse(fileName: string, language: string, code: string):
                 title: 'Context - High-level purpose',
                 description: `This ${language} file provides core functionality for the application.`,
                 mermaidDef: `flowchart TD
-    A[${fileName}] --> B[Core Logic]
-    B --> C[Data Processing]
-    B --> D[Output Generation]`,
+    A["${fileName}"] --> B["Core Logic"]
+    B --> C["Data Processing"]
+    B --> D["Output Generation"]`,
                 nodes: [
                     {
-                        id: 'main',
+                        id: 'A',
                         label: fileName,
                         type: 'module',
                         lineStart: 1,
@@ -232,7 +247,20 @@ function generateMockResponse(fileName: string, language: string, code: string):
                         logicTable: [
                             { condition: 'On import', action: 'Initialize module', output: 'Module ready', outputType: 'next' },
                         ],
-                        codeSnippet: lines.slice(0, 5).join('\n'),
+                        codeSnippet: codePreview,
+                    },
+                    {
+                        id: 'B',
+                        label: 'Core Logic',
+                        type: 'function',
+                        lineStart: 5,
+                        lineEnd: 20,
+                        narrative: 'The core logic processes input and produces output.',
+                        logicTable: [
+                            { condition: 'Valid input', action: 'Process data', output: 'Continue', outputType: 'next' },
+                            { condition: 'Invalid input', action: 'Return error', output: 'Exit', outputType: 'exit' },
+                        ],
+                        codeSnippet: midSection,
                     },
                 ],
             },
@@ -240,12 +268,12 @@ function generateMockResponse(fileName: string, language: string, code: string):
                 title: 'Container - Classes/Modules',
                 description: 'Structural containers identified in the code.',
                 mermaidDef: `flowchart TD
-    Module[Main Module] --> Functions[Functions]
-    Functions --> Utils[Utilities]`,
+    Module["Main Module"] --> Functions["Functions"]
+    Functions --> Utils["Utilities"]`,
                 nodes: [
                     {
-                        id: 'container',
-                        label: 'Main Container',
+                        id: 'Module',
+                        label: 'Main Module',
                         type: 'class',
                         lineStart: 1,
                         lineEnd: Math.floor(lineCount / 2),
@@ -253,7 +281,31 @@ function generateMockResponse(fileName: string, language: string, code: string):
                         logicTable: [
                             { condition: 'Instantiation', action: 'Create instance', output: 'Object ready', outputType: 'next' },
                         ],
-                        codeSnippet: lines.slice(0, 3).join('\n'),
+                        codeSnippet: codePreview,
+                    },
+                    {
+                        id: 'Functions',
+                        label: 'Functions',
+                        type: 'function',
+                        lineStart: Math.floor(lineCount / 3),
+                        lineEnd: Math.floor(lineCount * 2 / 3),
+                        narrative: 'Core functions that implement the business logic.',
+                        logicTable: [
+                            { condition: 'Function call', action: 'Execute logic', output: 'Return result', outputType: 'next' },
+                        ],
+                        codeSnippet: midSection,
+                    },
+                    {
+                        id: 'Utils',
+                        label: 'Utilities',
+                        type: 'function',
+                        lineStart: Math.floor(lineCount * 2 / 3),
+                        lineEnd: lineCount,
+                        narrative: 'Helper utilities used across the module.',
+                        logicTable: [
+                            { condition: 'Utility call', action: 'Helper action', output: 'Value', outputType: 'next' },
+                        ],
+                        codeSnippet: getCodeSnippet(Math.floor(lineCount * 2 / 3), lineCount),
                     },
                 ],
             },
