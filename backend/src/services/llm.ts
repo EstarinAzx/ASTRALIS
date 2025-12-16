@@ -106,6 +106,119 @@ B -- No --> D[Error]
 // Helpers
 // ============================================================================
 
+/**
+ * Convert raw code conditions to human-readable English
+ * Examples:
+ * - !editingProduct -> "Is editing product?"
+ * - !confirm('Delete?') -> "Did user confirm: Delete?"
+ * - loading -> "Is loading?"
+ * - !user -> "Is user logged in?"
+ */
+function conditionToEnglish(condition: string): string {
+    const c = condition.trim();
+
+    // 1. Confirm dialogs: !confirm('...') or !confirm(`...`)
+    const confirmMatch = c.match(/!?confirm\s*\(\s*[`'"](.+?)[`'"]\s*\)/);
+    if (confirmMatch) {
+        const message = confirmMatch[1].replace(/\$\{.*?\}/g, '...'); // Remove template vars
+        return c.startsWith('!')
+            ? `Did user confirm: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"?`
+            : `User confirmed: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"?`;
+    }
+
+    // 2. Negation patterns: !variableName
+    const negationMatch = c.match(/^!(\w+)$/);
+    if (negationMatch) {
+        const varName = negationMatch[1];
+        // Convert camelCase to readable: editingProduct -> "editing product"
+        const readable = varName.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+
+        // Common patterns
+        if (readable.includes('loading')) return 'Is not loading?';
+        if (readable.includes('editing')) return `Is not ${readable}?`;
+        if (readable.includes('user')) return 'Is user logged out?';
+        if (readable.includes('data')) return 'Is data empty?';
+        if (readable.includes('error')) return 'No error?';
+        if (readable.includes('valid')) return 'Is invalid?';
+
+        return `Is ${readable} false?`;
+    }
+
+    // 3. Positive check: variableName (without !)
+    const positiveMatch = c.match(/^(\w+)$/);
+    if (positiveMatch) {
+        const varName = positiveMatch[1];
+        const readable = varName.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+
+        if (readable.includes('loading')) return 'Is loading?';
+        if (readable.includes('editing')) return `Is ${readable}?`;
+        if (readable.includes('user')) return 'Is user logged in?';
+        if (readable.includes('error')) return 'Has error?';
+
+        return `Is ${readable}?`;
+    }
+
+    // 4. Method calls: !something.trim() or something.length === 0
+    if (c.includes('.trim()')) {
+        const varMatch = c.match(/!?(\w+)\.trim\(\)/);
+        if (varMatch) {
+            const readable = varMatch[1].replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+            return c.startsWith('!') ? `Is ${readable} empty?` : `Is ${readable} not empty?`;
+        }
+    }
+
+    // 5. Comparison: something === null, something !== undefined
+    if (c.includes('===') || c.includes('!==')) {
+        const parts = c.split(/===|!==/);
+        if (parts.length === 2) {
+            const varName = parts[0].trim().replace('!', '');
+            const value = parts[1].trim();
+            const readable = varName.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+
+            if (value === 'null' || value === 'undefined') {
+                return c.includes('!==') ? `Does ${readable} exist?` : `Is ${readable} missing?`;
+            }
+            return c.includes('!==') ? `Is ${readable} not ${value}?` : `Is ${readable} equal to ${value}?`;
+        }
+    }
+
+    // 6. Array/length checks
+    if (c.includes('.length')) {
+        const varMatch = c.match(/(\w+)\.length/);
+        if (varMatch) {
+            const readable = varMatch[1].replace(/([A-Z])/g, ' $1').toLowerCase().trim();
+            if (c.includes('=== 0') || c.includes('< 1')) return `Is ${readable} empty?`;
+            if (c.includes('> 0') || c.includes('>= 1')) return `Does ${readable} have items?`;
+            return `Check ${readable} length?`;
+        }
+    }
+
+    // 7. Complex conditions - simplify
+    if (c.length > 40) {
+        // Extract first meaningful part
+        const firstPart = c.split(/&&|\|\|/)[0].trim();
+        if (firstPart !== c) {
+            return conditionToEnglish(firstPart) + ' (+ more)';
+        }
+    }
+
+    // 8. Default: Clean up and make readable
+    let readable = c
+        .replace(/!/g, 'not ')
+        .replace(/&&/g, ' and ')
+        .replace(/\|\|/g, ' or ')
+        .replace(/([A-Z])/g, ' $1')
+        .toLowerCase()
+        .trim();
+
+    // Truncate if too long
+    if (readable.length > 35) {
+        readable = readable.substring(0, 32) + '...';
+    }
+
+    return readable.charAt(0).toUpperCase() + readable.slice(1) + '?';
+}
+
 interface CodeAnchor {
     line: number;
     type: 'API' | 'EFFECT' | 'RETURN' | 'HOOK';
@@ -120,17 +233,32 @@ function analyzeCodeAnchors(code: string): CodeAnchor[] {
         const l = line.trim();
         const lineNum = index + 1;
 
-        // 1. API Calls
+        // 1. API Calls (fetch, axios, etc.)
         if (l.match(/fetch\(|axios\.|query\(|mutation\(/i)) {
             anchors.push({ line: lineNum, type: 'API', content: l.substring(0, 50) });
         }
-        // 2. Effects
+        // 2. Async Arrow Functions (const name = async () => {})
+        else if (l.match(/^const\s+\w+\s*=\s*async\s*\(/)) {
+            const name = l.match(/^const\s+(\w+)/)?.[1] || 'asyncFn';
+            anchors.push({ line: lineNum, type: 'API', content: `Async: ${name}` });
+        }
+        // 3. Regular Arrow Functions (const name = (...) => {})
+        else if (l.match(/^const\s+\w+\s*=\s*\([^)]*\)\s*(:\s*\w+)?\s*=>/)) {
+            const name = l.match(/^const\s+(\w+)/)?.[1] || 'fn';
+            anchors.push({ line: lineNum, type: 'HOOK', content: `Function: ${name}` });
+        }
+        // 4. Effects
         else if (l.startsWith('useEffect')) {
             anchors.push({ line: lineNum, type: 'EFFECT', content: 'Side Effect Trigger' });
         }
-        // 3. Early Returns (Guards)
+        // 5. Early Returns (Guards)
         else if (l.startsWith('if') && l.includes('return')) {
             anchors.push({ line: lineNum, type: 'RETURN', content: 'Logic Guard' });
+        }
+        // 6. Custom Hooks (useAuth, useQuery, etc.)
+        else if (l.match(/^const\s+.*=\s*use[A-Z]/)) {
+            const hookName = l.match(/use[A-Z]\w+/)?.[0] || 'useHook';
+            anchors.push({ line: lineNum, type: 'HOOK', content: `Hook: ${hookName}` });
         }
     });
 
@@ -492,41 +620,79 @@ function validateAndFillGaps(
 // Helper to detect what type of code a section contains
 function detectCodeType(code: string, lineStart: number, lineEnd: number): { label: string, shape: NodeShape, color: SectionColor } {
     const lower = code.toLowerCase().trim();
+    const original = code.trim();
 
-    // 1. Loading Checks (Diamond)
+    // 1. Async Arrow Functions (const name = async () => {})
+    const asyncArrowMatch = original.match(/^const\s+(\w+)\s*=\s*async\s*\(/m);
+    if (asyncArrowMatch) {
+        const fnName = asyncArrowMatch[1];
+        // Check if it's an API/fetch function
+        if (lower.includes('fetch(') || lower.includes('api')) {
+            return { label: `API: ${fnName}`, shape: 'hexagon', color: 'purple' };
+        }
+        // Check if it's a handler
+        if (fnName.toLowerCase().startsWith('handle') || fnName.toLowerCase().includes('submit') || fnName.toLowerCase().includes('update')) {
+            return { label: `Handler: ${fnName}`, shape: 'hexagon', color: 'purple' };
+        }
+        return { label: `Async: ${fnName}`, shape: 'hexagon', color: 'purple' };
+    }
+
+    // 2. Regular Arrow Functions (const name = (...) => {})
+    const arrowMatch = original.match(/^const\s+(\w+)\s*=\s*\([^)]*\)\s*(:\s*[^=]+)?\s*=>/m);
+    if (arrowMatch) {
+        const fnName = arrowMatch[1];
+        // Check if it's a getter/helper
+        if (fnName.toLowerCase().startsWith('get')) {
+            return { label: `Helper: ${fnName}`, shape: 'rectangle', color: 'orange' };
+        }
+        // Check if it's a handler
+        if (fnName.toLowerCase().startsWith('handle')) {
+            return { label: `Handler: ${fnName}`, shape: 'rectangle', color: 'blue' };
+        }
+        return { label: `Function: ${fnName}`, shape: 'rectangle', color: 'blue' };
+    }
+
+    // 3. Loading Checks (Diamond)
     if (lower.match(/if\s*\(\s*!*loading/)) {
         return { label: 'Is Loading?', shape: 'diamond', color: 'orange' };
     }
 
-    // 2. Early Returns / Error Checks (Diamond)
-    if (lower.match(/if\s*\(\s*!/) || lower.match(/if\s*\(/)) {
+    // 4. If statements - extract and convert condition to English
+    const ifMatch = original.match(/if\s*\(([^)]+(?:\([^)]*\))?[^)]*)\)/);
+    if (ifMatch) {
+        const readable = conditionToEnglish(ifMatch[1]);
         if (lower.includes('return')) {
-            return { label: 'Logic Check & Return', shape: 'diamond', color: 'red' };
+            return { label: readable, shape: 'diamond', color: 'red' };
         }
-        return { label: 'Logic Condition', shape: 'diamond', color: 'orange' };
+        return { label: readable, shape: 'diamond', color: 'orange' };
     }
 
-    // 3. API Calls
+    // 5. API Calls
     if (lower.includes('async') && lower.includes('fetch')) return { label: 'API Fetch Function', shape: 'hexagon', color: 'purple' };
     if (lower.includes('fetch(')) return { label: 'Data Fetching', shape: 'hexagon', color: 'purple' };
 
-    // 4. Handlers
+    // 6. Handlers (fallback)
     if (lower.includes('handle') && lower.includes('async')) return { label: 'Event Handler (Async)', shape: 'rectangle', color: 'purple' };
     if (lower.includes('handle')) return { label: 'Event Handler', shape: 'rectangle', color: 'blue' };
 
-    // 5. Hooks
-    if (lower.startsWith('useeffect')) return { label: 'Side Effect (useEffect)', shape: 'rounded', color: 'green' };
-    if (lower.startsWith('usestate')) return { label: 'State Declaration', shape: 'rectangle', color: 'green' };
+    // 7. Hooks
+    if (lower.match(/^\s*useeffect/)) return { label: 'Side Effect (useEffect)', shape: 'rounded', color: 'green' };
+    if (lower.match(/^\s*usestate/)) return { label: 'State Declaration', shape: 'rectangle', color: 'green' };
+    if (lower.match(/use[a-z]+\(/)) return { label: 'Hook Call', shape: 'rectangle', color: 'green' };
 
-    // 6. Structure
+    // 8. Structure
     if (lower.includes('interface') || lower.includes('type ')) return { label: 'Type Definition', shape: 'rectangle', color: 'blue' };
     if (lower.includes('import')) return { label: 'Imports', shape: 'rectangle', color: 'blue' };
 
-    // 7. Render & JSX
+    // 9. Render & JSX
     if (lower.includes('return') && lower.includes('<')) return { label: 'Component Render', shape: 'rounded', color: 'cyan' };
 
-    // 8. Default
-    return { label: `Code Block (Lines ${lineStart}-${lineEnd})`, shape: 'rectangle', color: 'orange' };
+    // 10. Default - make more descriptive
+    const lineCount = lineEnd - lineStart + 1;
+    if (lineCount <= 3) {
+        return { label: 'Logic Block', shape: 'rectangle', color: 'blue' };
+    }
+    return { label: `Code Section (${lineCount} lines)`, shape: 'rectangle', color: 'orange' };
 }
 
 // ============================================================================
@@ -655,7 +821,7 @@ function generateMockResponse(fileName: string, language: string, code: string):
 
     // Find useState hooks
     lines.forEach((line, i) => {
-        if (line.includes('useState')) {
+        if (line.includes('useState') && !nodes.some(n => n.lineStart === i + 1)) {
             const match = line.match(/const\s+\[(\w+)/);
             const name = match?.[1] || 'state';
             nodeId++;
@@ -680,9 +846,37 @@ function generateMockResponse(fileName: string, language: string, code: string):
         }
     });
 
+    // Find custom hooks (useAuth, useNavigate, useQuery, etc.)
+    lines.forEach((line, i) => {
+        // Match: const { ... } = useHookName() or const name = useHookName()
+        const hookMatch = line.match(/=\s*(use[A-Z]\w+)\s*\(/);
+        if (hookMatch && !line.includes('useState') && !line.includes('useEffect') && !nodes.some(n => n.lineStart === i + 1)) {
+            const hookName = hookMatch[1];
+            nodeId++;
+            addNode({
+                id: `n${nodeId}`,
+                label: `Hook: ${hookName}`,
+                subtitle: 'Custom Hook',
+                shape: 'rectangle',
+                color: 'green',
+                narrative: `Use ${hookName} hook for additional functionality.`,
+                codeSnippet: line.trim(),
+                lineStart: i + 1,
+                lineEnd: i + 1,
+                logicTable: [{
+                    step: '1',
+                    trigger: 'Component render',
+                    action: `Call ${hookName}`,
+                    output: 'Hook value',
+                    codeRef: line.trim(),
+                }],
+            });
+        }
+    });
+
     // Find useEffect
     for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes('useEffect')) {
+        if (lines[i].includes('useEffect') && !nodes.some(n => n.lineStart === i + 1)) {
             const startLine = i + 1;
             let braces = 0;
             let j = i;
@@ -753,33 +947,175 @@ function generateMockResponse(fileName: string, language: string, code: string):
         }
     }
 
-    // Find guard clauses (if ... return)
-    lines.forEach((line, i) => {
-        if ((line.includes('if (') || line.includes('if(')) && line.includes('return')) {
-            const condition = line.match(/if\s*\(([^)]+)\)/)?.[1] || 'condition';
+    // Find async arrow functions (const name = async () => {...})
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const asyncArrowMatch = line.match(/^\s*const\s+(\w+)\s*=\s*async\s*\([^)]*\)\s*=>/);
+        if (asyncArrowMatch && !nodes.some(n => n.lineStart === i + 1)) {
+            const name = asyncArrowMatch[1];
+            const startLine = i + 1;
+            let braces = 0;
+            let j = i;
+            // Count opening brace on this line or next
+            do {
+                braces += (lines[j].match(/{/g) || []).length;
+                braces -= (lines[j].match(/}/g) || []).length;
+                j++;
+            } while (braces > 0 && j < lines.length);
+
+            // Determine if it's an API call (contains fetch)
+            const fnCode = lines.slice(i, j).join('\n');
+            const isApiCall = fnCode.includes('fetch(') || fnCode.includes('axios');
+            const label = isApiCall ? `API: ${name}` : `Async: ${name}`;
+
             nodeId++;
             addNode({
                 id: `n${nodeId}`,
-                label: `Guard: ${condition}`,
-                subtitle: 'Early Return',
-                shape: 'diamond',
-                color: 'orange',
-                isDecision: true,
-                condition,
-                narrative: 'Guard clause for early return.',
-                codeSnippet: line.trim(),
-                lineStart: i + 1,
-                lineEnd: i + 1,
+                label,
+                subtitle: isApiCall ? 'API Call' : 'Async Function',
+                shape: 'hexagon',
+                color: 'purple',
+                narrative: isApiCall
+                    ? `Fetches data from API via ${name}.`
+                    : `Async function ${name} for async operations.`,
+                codeSnippet: lines.slice(i, Math.min(i + 8, j)).join('\n'),
+                lineStart: startLine,
+                lineEnd: j,
                 logicTable: [{
                     step: '1',
-                    trigger: 'Render',
-                    action: `Check ${condition}`,
-                    output: 'Branch',
-                    codeRef: line.trim(),
+                    trigger: 'Function called',
+                    action: isApiCall ? 'Fetch data' : 'Execute async',
+                    output: 'Promise',
+                    codeRef: `const ${name} = async () => {...}`,
                 }],
             });
+            i = j - 1;
         }
-    });
+    }
+
+    // Find regular arrow functions (const name = (...) => {...})
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Match: const name = (args) => { or const name = (args): ReturnType => {
+        const arrowMatch = line.match(/^\s*const\s+(\w+)\s*=\s*\([^)]*\)\s*(:\s*[^=]+)?\s*=>/);
+        if (arrowMatch && !line.includes('async') && !nodes.some(n => n.lineStart === i + 1)) {
+            const name = arrowMatch[1];
+            const startLine = i + 1;
+
+            // Check if it's a single-line arrow or multi-line
+            let endLine = startLine;
+            if (line.includes('{')) {
+                let braces = 0;
+                let j = i;
+                do {
+                    braces += (lines[j].match(/{/g) || []).length;
+                    braces -= (lines[j].match(/}/g) || []).length;
+                    j++;
+                } while (braces > 0 && j < lines.length);
+                endLine = j;
+            }
+
+            // Determine type based on name
+            let label = `Function: ${name}`;
+            let subtitle = 'Helper Function';
+            let color: SectionColor = 'blue';
+            let shape: NodeShape = 'rectangle';
+
+            if (name.toLowerCase().startsWith('get')) {
+                label = `Helper: ${name}`;
+                subtitle = 'Getter Function';
+                color = 'orange';
+            } else if (name.toLowerCase().startsWith('handle')) {
+                label = `Handler: ${name}`;
+                subtitle = 'Event Handler';
+                color = 'blue';
+            } else if (name.toLowerCase().startsWith('render')) {
+                label = `Render: ${name}`;
+                subtitle = 'Render Helper';
+                color = 'cyan';
+            }
+
+            nodeId++;
+            addNode({
+                id: `n${nodeId}`,
+                label,
+                subtitle,
+                shape,
+                color,
+                narrative: `Helper function ${name} for logic processing.`,
+                codeSnippet: lines.slice(i, Math.min(i + 6, endLine)).join('\n'),
+                lineStart: startLine,
+                lineEnd: endLine,
+                logicTable: [{
+                    step: '1',
+                    trigger: 'Function called',
+                    action: `Execute ${name}`,
+                    output: 'Result',
+                    codeRef: `const ${name} = (...) => {...}`,
+                }],
+            });
+            i = endLine - 1;
+        }
+    }
+
+    // Find guard clauses (if ... return) and other conditionals
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Skip if already has a node at this line
+        if (nodes.some(n => n.lineStart === i + 1)) continue;
+
+        // Match if statements with various patterns
+        const ifMatch = line.match(/if\s*\(([^)]+(?:\([^)]*\))?[^)]*)\)/);
+        if (!ifMatch) continue;
+
+        const condition = ifMatch[1];
+        const readableLabel = conditionToEnglish(condition);
+        const isGuard = line.includes('return');
+
+        // Find the end of this if block
+        let endLine = i + 1;
+        if (line.includes('{') && !line.includes('}')) {
+            let braces = 0;
+            let j = i;
+            do {
+                braces += (lines[j].match(/{/g) || []).length;
+                braces -= (lines[j].match(/}/g) || []).length;
+                j++;
+            } while (braces > 0 && j < lines.length);
+            endLine = j;
+        }
+
+        nodeId++;
+        addNode({
+            id: `n${nodeId}`,
+            label: readableLabel,
+            subtitle: isGuard ? 'Guard Clause' : 'Decision',
+            shape: 'diamond',
+            color: isGuard ? 'red' : 'orange',
+            isDecision: true,
+            condition: readableLabel,
+            yesTarget: isGuard ? 'Early exit' : undefined,
+            noTarget: isGuard ? 'Continue' : undefined,
+            narrative: isGuard
+                ? `Guard clause that checks: ${readableLabel}. If true, returns early.`
+                : `Decision point: ${readableLabel}`,
+            codeSnippet: lines.slice(i, Math.min(i + 3, endLine)).join('\n'),
+            lineStart: i + 1,
+            lineEnd: endLine,
+            logicTable: [{
+                step: '1',
+                trigger: isGuard ? 'Before render' : 'Logic flow',
+                action: readableLabel,
+                output: isGuard ? 'Return or continue' : 'Branch',
+                codeRef: line.trim().substring(0, 60),
+                lineStart: i + 1,
+                lineEnd: endLine,
+            }],
+        });
+
+        i = endLine - 1;
+    }
 
     // Find main return (JSX)
     for (let i = lines.length - 1; i >= 0; i--) {
@@ -817,12 +1153,49 @@ function generateMockResponse(fileName: string, language: string, code: string):
         }
     }
 
+    // =========================================================================
+    // FINAL STEP: Sort nodes by lineStart and rebuild edges for proper flow
+    // =========================================================================
+
+    // 1. Sort all nodes by their starting line number
+    nodes.sort((a, b) => (a.lineStart || 0) - (b.lineStart || 0));
+
+    // 2. Remove duplicate nodes (same lineStart)
+    const uniqueNodes: FlowNode[] = [];
+    const seenLines = new Set<number>();
+    for (const node of nodes) {
+        if (!seenLines.has(node.lineStart)) {
+            seenLines.add(node.lineStart);
+            uniqueNodes.push(node);
+        }
+    }
+
+    // 3. Rebuild edges to connect nodes in order
+    const finalEdges: FlowEdge[] = [];
+    for (let i = 0; i < uniqueNodes.length - 1; i++) {
+        const current = uniqueNodes[i];
+        const next = uniqueNodes[i + 1];
+
+        // Skip adding edge if current node ends way before next starts (might be different branches)
+        const gap = (next.lineStart || 0) - (current.lineEnd || 0);
+
+        finalEdges.push({
+            id: `e_${current.id}_${next.id}`,
+            source: current.id,
+            target: next.id,
+            animated: current.isDecision, // Animate decision edges
+            label: current.isDecision ? 'then' : undefined,
+        });
+    }
+
+    console.log(`📊 Mock parser: ${uniqueNodes.length} nodes, ${finalEdges.length} edges`);
+
     return {
         fileName,
         language,
-        nodes,
-        edges,
+        nodes: uniqueNodes,
+        edges: finalEdges,
         totalLines: lines.length,
-        totalSections: nodes.length,
+        totalSections: uniqueNodes.length,
     };
 }
