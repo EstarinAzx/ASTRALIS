@@ -217,6 +217,14 @@ CRITICAL COVERAGE REQUIREMENT:
 - Include: imports, interfaces, types, function signatures, hooks, conditionals, returns, everything
 - When grouping, use lineStart of first line and lineEnd of last line in the group
 
+⚠️ HANDLER FUNCTIONS - DO NOT SKIP:
+- Event handlers (handleSubmit, handleClick, onChange, etc.) MUST have their own nodes
+- Each handler should be a separate node with shape: "hexagon" (for async) or "rectangle"
+- Include the ENTIRE function body from const/function to closing }
+- Example: "handleSubmit" function → node with label "Handle form submission"
+- Handler functions are NOT part of the render - they are BEFORE render in the flow
+
+
 CODE SNIPPET RULES:
 - codeSnippet MUST contain the COMPLETE source code for that node
 - NEVER abbreviate with {...} or ... or [truncated]
@@ -322,12 +330,134 @@ export async function callLLM(
 
         const parsed = JSON.parse(content) as AnalysisResult;
         console.log('✅ LLM parsed successfully with', parsed.nodes?.length || 0, 'nodes');
-        return parsed;
+
+        // Validate and fill gaps
+        const validated = validateAndFillGaps(parsed, code, fileName, language);
+        return validated;
     } catch (error) {
         console.error('❌ LLM failed:', error);
         console.log('⚠️ Falling back to mock parser');
         return generateMockResponse(fileName, language, code);
     }
+}
+
+// ============================================================================
+// Gap Validator - Ensures 100% code coverage
+// ============================================================================
+function validateAndFillGaps(
+    result: AnalysisResult,
+    code: string,
+    fileName: string,
+    language: string
+): AnalysisResult {
+    const totalLines = code.split('\n').length;
+    const nodes = [...result.nodes];
+    const edges = [...result.edges];
+
+    // Sort nodes by lineStart
+    nodes.sort((a, b) => (a.lineStart || 0) - (b.lineStart || 0));
+
+    const gaps: { start: number; end: number; afterNodeId: string | null }[] = [];
+    let lastEnd = 0;
+    let lastNodeId: string | null = null;
+
+    // Find gaps between nodes
+    for (const node of nodes) {
+        const start = node.lineStart || 0;
+        const end = node.lineEnd || 0;
+
+        if (start > lastEnd + 1) {
+            gaps.push({ start: lastEnd + 1, end: start - 1, afterNodeId: lastNodeId });
+        }
+
+        lastEnd = Math.max(lastEnd, end);
+        lastNodeId = node.id;
+    }
+
+    // Check if there's a gap at the end
+    if (lastEnd < totalLines) {
+        gaps.push({ start: lastEnd + 1, end: totalLines, afterNodeId: lastNodeId });
+    }
+
+    // Check if there's a gap at the beginning
+    if (nodes.length > 0 && (nodes[0].lineStart || 0) > 1) {
+        gaps.unshift({ start: 1, end: (nodes[0].lineStart || 1) - 1, afterNodeId: null });
+    }
+
+    if (gaps.length > 0) {
+        console.log(`⚠️ Found ${gaps.length} coverage gaps, filling...`);
+
+        const codeLines = code.split('\n');
+
+        for (const gap of gaps) {
+            const gapCode = codeLines.slice(gap.start - 1, gap.end).join('\n');
+            const gapId = `gap_${gap.start}_${gap.end}`;
+
+            // Determine what kind of code this is
+            const label = detectCodeType(gapCode, gap.start, gap.end);
+
+            const newNode: FlowNode = {
+                id: gapId,
+                label: label,
+                subtitle: `Lines ${gap.start}-${gap.end}`,
+                shape: 'rectangle',
+                color: 'orange',
+                narrative: `Code section from lines ${gap.start} to ${gap.end} that was not captured by the analysis.`,
+                codeSnippet: gapCode,
+                lineStart: gap.start,
+                lineEnd: gap.end,
+                logicTable: [{
+                    step: '1',
+                    trigger: 'Code execution',
+                    action: label,
+                    output: 'See code',
+                }],
+                next: [],
+            };
+
+            nodes.push(newNode);
+
+            // Add edge from previous node to this gap
+            if (gap.afterNodeId) {
+                edges.push({
+                    id: `e_to_${gapId}`,
+                    source: gap.afterNodeId,
+                    target: gapId,
+                });
+            }
+
+            console.log(`  📍 Filled gap: Lines ${gap.start}-${gap.end} → "${label}"`);
+        }
+
+        // Re-sort after adding gap nodes
+        nodes.sort((a, b) => (a.lineStart || 0) - (b.lineStart || 0));
+    }
+
+    return {
+        ...result,
+        nodes,
+        edges,
+        totalLines,
+    };
+}
+
+// Helper to detect what type of code a section contains
+function detectCodeType(code: string, lineStart: number, lineEnd: number): string {
+    const lower = code.toLowerCase();
+
+    if (lower.includes('async') && lower.includes('fetch')) return 'API Fetch Functions';
+    if (lower.includes('const fetch') || lower.includes('function fetch')) return 'Data Fetching';
+    if (lower.includes('handle') && lower.includes('async')) return 'Event Handlers';
+    if (lower.includes('handle')) return 'Event Handlers';
+    if (lower.includes('useeffect')) return 'Side Effects';
+    if (lower.includes('usestate')) return 'State Declarations';
+    if (lower.includes('interface') || lower.includes('type ')) return 'Type Definitions';
+    if (lower.includes('import')) return 'Imports';
+    if (lower.includes('return') && lower.includes('<')) return 'JSX Render';
+    if (lower.includes('const') && lower.includes('=>')) return 'Helper Functions';
+    if (lower.includes('switch') || lower.includes('case')) return 'Switch Statement';
+
+    return `Code Block (Lines ${lineStart}-${lineEnd})`;
 }
 
 // ============================================================================
