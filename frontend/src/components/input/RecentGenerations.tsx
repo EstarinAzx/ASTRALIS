@@ -79,7 +79,7 @@ export function RecentGenerations() {
                             {gen.fileName}
                         </div>
                         <div className="text-xs text-[var(--text-muted)]">
-                            {gen.mode.replace('_', ' ')} • {formatTime(gen.createdAt)}
+                            {gen.language} • {formatTime(gen.createdAt)}
                         </div>
                     </div>
                 </button>

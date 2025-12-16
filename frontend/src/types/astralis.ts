@@ -1,95 +1,109 @@
 // ============================================================================
-// ASTRALIS Types - Updated for v2 UI
+// ASTRALIS Types - Unified Flowchart Structure
 // ============================================================================
 
-export type VerbosityMode = 'concise' | 'standard' | 'deep_dive';
+// Node shapes in the flowchart
+export type NodeShape = 'rectangle' | 'diamond' | 'rounded' | 'hexagon';
 
-// ============================================================================
-// Language Detection
-// ============================================================================
+// Section colors
+export type SectionColor = 'blue' | 'green' | 'orange' | 'purple' | 'red' | 'cyan';
+
+// Supported languages
 export const SUPPORTED_LANGUAGES = [
-    { value: 'javascript', label: 'JavaScript' },
     { value: 'typescript', label: 'TypeScript' },
+    { value: 'javascript', label: 'JavaScript' },
     { value: 'python', label: 'Python' },
     { value: 'java', label: 'Java' },
-    { value: 'go', label: 'Go' },
-    { value: 'rust', label: 'Rust' },
     { value: 'csharp', label: 'C#' },
     { value: 'cpp', label: 'C++' },
-    { value: 'ruby', label: 'Ruby' },
+    { value: 'go', label: 'Go' },
+    { value: 'rust', label: 'Rust' },
     { value: 'php', label: 'PHP' },
-] as const;
+    { value: 'ruby', label: 'Ruby' },
+    { value: 'swift', label: 'Swift' },
+    { value: 'kotlin', label: 'Kotlin' },
+];
 
-export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]['value'];
+// Each step in a logic table
+export interface LogicStep {
+    step: string;           // e.g., "0.1", "1", "2.3"
+    trigger: string;        // Trigger/Condition
+    action: string;         // What happens
+    output: string;         // Result/Output
+    codeRef?: string;       // Related code snippet
+    lineStart?: number;
+    lineEnd?: number;
+}
 
-// ============================================================================
-// Diagram Node (for interactive diagram)
-// ============================================================================
-export interface DiagramNode {
+// A flowchart node (section)
+export interface FlowNode {
     id: string;
-    label: string;
-    type: 'controller' | 'service' | 'method' | 'function' | 'class' | 'module';
-    children?: string[];
+    label: string;                    // e.g., "SECTION 1 — SETUP"
+    subtitle?: string;                // e.g., "Imports & Definitions"
+    shape: NodeShape;                 // rectangle, diamond, etc.
+    color: SectionColor;              // Section color
+    position?: { x: number; y: number };
+
+    // For decisions (diamond nodes)
+    isDecision?: boolean;
+    condition?: string;               // e.g., "Has ID?"
+    yesTarget?: string;               // Node ID for Yes
+    noTarget?: string;                // Node ID for No
+
+    // Logic table for this section
+    logicTable: LogicStep[];
+
+    // Connected nodes (for non-decision nodes)
+    next?: string[];                  // Node IDs this connects to
+
+    // Summary for narrative
+    narrative: string;
+
+    // Source code for this section
+    codeSnippet: string;
     lineStart: number;
     lineEnd: number;
-    narrative: string;
-    logicTable: LogicRow[];
-    codeSnippet: string;
 }
 
-export interface LogicRow {
-    condition: string;
-    action: string;
-    output: string;
-    outputType: 'next' | 'exit' | 'loop';
+// Edge between nodes
+export interface FlowEdge {
+    id: string;
+    source: string;
+    target: string;
+    label?: string;                   // "Yes", "No", etc.
+    animated?: boolean;
 }
 
-// ============================================================================
-// Layer Data
-// ============================================================================
-export interface LayerData {
-    title: string;
-    description: string;
-    mermaidDef: string;
-    nodes: DiagramNode[];
-}
-
-// ============================================================================
-// Complete ASTRALIS Response (v2)
-// ============================================================================
-export interface AstralisResponse {
-    fileName: string;
-    language: string;
-    layers: {
-        L0_context: LayerData;
-        L1_container: LayerData;
-        L2_component: LayerData;
-        L3_code: LayerData;
-        L4_data: LayerData;
-        L5_infra: LayerData;
-    };
-}
-
-// ============================================================================
-// Analysis Result (from API)
-// ============================================================================
+// Complete analysis result
 export interface AnalysisResult {
     id: string;
     fileName: string;
     language: string;
-    mode: VerbosityMode;
-    result: AstralisResponse;
-    cached: boolean;
     createdAt: string;
+
+    // Unified flowchart
+    nodes: FlowNode[];
+    edges: FlowEdge[];
+
+    // Metadata
+    totalLines: number;
+    totalSections: number;
 }
 
-// ============================================================================
-// Recent Generation Item
-// ============================================================================
+// API response wrapper
+export interface AnalysisResponse {
+    success: boolean;
+    data?: AnalysisResult;
+    error?: string;
+}
+
+// Verbosity modes
+export type VerbosityMode = 'concise' | 'standard' | 'deep_dive';
+
+// Recent generation history
 export interface RecentGeneration {
     id: string;
     fileName: string;
     language: string;
-    mode: VerbosityMode;
     createdAt: string;
 }
