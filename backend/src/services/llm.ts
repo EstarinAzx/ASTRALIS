@@ -57,58 +57,121 @@ interface AnalysisResult {
 }
 
 // ============================================================================
-// System Prompt for Complete Coverage
+// System Prompt - Semantic Flowchart (like user example)
 // ============================================================================
 function buildSystemPrompt(mode: VerbosityMode): string {
     const modeDescriptions = {
-        concise: 'Group related constructs. Create 8-12 nodes.',
-        standard: 'Each major construct gets a node. Create 12-20 nodes.',
-        deep_dive: 'Every construct gets a node. Create 20+ nodes. COMPLETE COVERAGE.',
+        concise: 'Create 10-15 logical flow nodes. Group related steps.',
+        standard: 'Create 15-25 logical flow nodes. Show all major paths.',
+        deep_dive: 'Create 25+ nodes. Every decision, function, and flow step visible.',
     };
 
-    return `You are ASTRALIS - a code visualization system that creates COMPLETE flowcharts.
+    return `You are ASTRALIS - a code visualization system that creates SEMANTIC FLOWCHARTS.
 
 MODE: ${mode.toUpperCase()} - ${modeDescriptions[mode]}
 
-CRITICAL: EVERY CODE CONSTRUCT MUST BE COVERED. Create a node for:
-- Import statements (group or individual)
-- Each interface/type definition with ALL properties in logic table
-- Function definitions
-- Each hook (useState, useEffect, useParams)
-- Each conditional (if/else)
-- Each API call (fetch, await)
-- Each return statement
-- Guard clauses (early returns)
+YOUR GOAL: Create a flowchart that shows the LOGICAL EXECUTION FLOW of the code, not just its structure.
+Think of it like explaining the code to a junior developer step by step.
 
-RESPOND WITH ONLY VALID JSON (no markdown):
+IMPORTANT PRINCIPLES:
+1. Each node represents a LOGICAL STEP (not just a code construct)
+   - "Provider mounts in the app" NOT "export const AuthProvider"
+   - "Create user and loading state" NOT "useState calls"
+   - "Try to restore session from browser storage" NOT "useEffect"
+
+2. Use DECISION DIAMONDS for real conditionals with Yes/No branches:
+   - "Valid token and user data found?"
+   - "Is there a logged-in user?"
+   - "Login successful?"
+
+3. Group related code into logical steps:
+   - Multiple lines that work together = one node
+   - Show the PURPOSE not just the syntax
+
+4. Narratives must explain WHAT the code does in plain English
+
+RESPOND WITH ONLY VALID JSON:
 
 {
   "fileName": "string",
   "language": "string",
   "totalLines": number,
   "totalSections": number,
-  "nodes": [...],
-  "edges": [...]
-}
-
-NODE FORMAT:
-{
-  "id": "unique_id",
-  "label": "NODE LABEL",
-  "subtitle": "description",
-  "shape": "rectangle|diamond|rounded|hexagon",
-  "color": "blue|green|orange|purple|red|cyan",
-  "narrative": "What this section does",
-  "codeSnippet": "actual code",
-  "lineStart": 1,
-  "lineEnd": 10,
-  "logicTable": [
-    { "step": "1", "trigger": "...", "action": "...", "output": "...", "codeRef": "..." }
+  "nodes": [
+    {
+      "id": "unique_id",
+      "label": "Human-readable step name",
+      "subtitle": "Brief description",
+      "shape": "rectangle|diamond|rounded|hexagon",
+      "color": "blue|green|orange|purple|red|cyan",
+      "narrative": "Plain English explanation of what this code section does and why",
+      "codeSnippet": "The actual code this node represents",
+      "lineStart": 1,
+      "lineEnd": 10,
+      "isDecision": true/false,
+      "condition": "The question being asked (for diamonds)",
+      "yesTarget": "node_id for Yes branch",
+      "noTarget": "node_id for No branch",
+      "next": ["node_id"] (for non-decision nodes),
+      "logicTable": [
+        {
+          "step": "1",
+          "trigger": "What causes this step",
+          "action": "What happens",
+          "output": "The result",
+          "codeRef": "Specific code reference"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "node1", "target": "node2", "label": "Yes/No or empty" }
   ]
 }
 
-SHAPES: rectangle=definitions, diamond=conditionals, rounded=start/end, hexagon=async/api
-COLORS: blue=imports/types, green=state, orange=logic, purple=effects/api, red=errors, cyan=render`;
+SHAPES:
+- "rectangle" = State, definitions, assignments, setup steps
+- "diamond" = if/else, conditionals, checks (MUST have Yes/No branches)
+- "rounded" = Start/end nodes, final renders
+- "hexagon" = API calls, fetch, async operations
+
+COLORS:
+- "blue" = Imports, setup, initialization
+- "green" = State declarations, hooks
+- "orange" = Conditionals, decisions, logic
+- "purple" = API calls, async, side effects
+- "red" = Error handling, catch blocks, failures
+- "cyan" = Render output, return JSX
+
+FLOW PATTERN FOR REACT COMPONENTS:
+1. Component mounts → Create state → Check/restore saved data
+2. Decision: Data found? → Yes: use it, No: handle missing
+3. Effects run → API calls → Decision: Success? → Yes: store, No: error
+4. Render decision: Loading? → Yes: show loader, No: render UI
+5. User actions → Functions (login, logout, etc.) each with their own flow
+
+LOGIC TABLE: For each node, break down into steps that explain:
+- What triggers this code to run
+- What action it takes
+- What the output/result is
+- The specific code reference
+
+CRITICAL COVERAGE REQUIREMENT:
+- EVERY line of code must be covered by at least one node
+- lineStart and lineEnd MUST span the entire file from line 1 to the last line
+- NO GAPS: If the code has 200 lines, your nodes must cover lines 1-200
+- Check your work: Add up all lineStart-lineEnd ranges = total lines
+- Include: imports, interfaces, types, function signatures, hooks, conditionals, returns, everything
+- When grouping, use lineStart of first line and lineEnd of last line in the group
+
+VERIFICATION: Before responding, verify:
+□ First node starts at line 1
+□ Last node ends at the final line
+□ No line numbers are skipped between nodes
+□ Every interface has its properties in a logic table
+□ Every function/method is represented
+
+REMEMBER: The goal is COMPLETE coverage - every single piece of code must be visualized.`;
 }
 
 // ============================================================================
