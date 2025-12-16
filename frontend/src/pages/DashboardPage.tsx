@@ -38,15 +38,31 @@ export function DashboardPage() {
                 setLoading(true);
                 setError(null);
 
-                const response = await api.get<{ success: boolean; data: AnalysisResult }>(`/analyze/${id}`);
+                // api.get<T> returns { status: string, data: T }
+                // Backend data: { id, fileName, language, result: {...} }
+                interface AnalysisData {
+                    id: string;
+                    fileName: string;
+                    language: string;
+                    result: AnalysisResult;
+                }
 
-                if (response.data.success && response.data.data) {
-                    setResult(response.data.data);
+                const response = await api.get<AnalysisData>(`/analyze/${id}`);
+
+                console.log('📥 Dashboard API Response:', response);
+
+                if (response.status === 'success' && response.data?.result) {
+                    const analysisResult = {
+                        ...response.data.result,
+                        id: response.data.id,
+                    };
+                    setResult(analysisResult);
                     // Select first node by default
-                    if (response.data.data.nodes.length > 0) {
-                        setSelectedNode(response.data.data.nodes[0]);
+                    if (analysisResult.nodes && analysisResult.nodes.length > 0) {
+                        setSelectedNode(analysisResult.nodes[0]);
                     }
                 } else {
+                    console.error('❌ Response check failed:', response);
                     setError('Analysis not found');
                 }
             } catch (err) {

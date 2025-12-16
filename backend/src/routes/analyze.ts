@@ -64,8 +64,11 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
         // Call LLM
         console.log(`🤖 Calling LLM for ${fileName} (${verbosityMode} mode)...`);
         const result = await callLLM(code, fileName, language, verbosityMode);
+        console.log('✅ LLM call completed');
+        console.log('📊 Result has', result.nodes?.length || 0, 'nodes');
 
         // Save to history
+        console.log('💾 Saving to database...');
         const analysis = await prisma.analysisHistory.create({
             data: {
                 userId,
@@ -76,6 +79,7 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
                 result: result as object,
             },
         });
+        console.log('✅ Saved with ID:', analysis.id);
 
         res.json({
             status: 'success',
@@ -89,6 +93,7 @@ router.post('/', async (req: AuthenticatedRequest, res, next) => {
             },
         });
     } catch (error) {
+        console.error('❌ Error in analyze route:', error);
         next(error);
     }
 });

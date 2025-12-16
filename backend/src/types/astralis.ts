@@ -6,6 +6,14 @@ export type VerbosityMode = 'concise' | 'standard' | 'deep_dive';
 export type NodeShape = 'rectangle' | 'diamond' | 'rounded' | 'hexagon';
 export type SectionColor = 'blue' | 'green' | 'orange' | 'purple' | 'red' | 'cyan';
 
+// Request type for analyze endpoint
+export interface AnalyzeRequest {
+    code: string;
+    fileName: string;
+    language: string;
+    mode: VerbosityMode;
+}
+
 export interface LogicStep {
     step: string;
     trigger: string;

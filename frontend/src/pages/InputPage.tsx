@@ -11,7 +11,7 @@ import { VerbosityCard } from '../components/input/VerbosityCard';
 import { RecentGenerations } from '../components/input/RecentGenerations';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import type { VerbosityMode, AnalysisResult } from '../types/astralis';
+import type { VerbosityMode } from '../types/astralis';
 
 export function InputPage() {
     const navigate = useNavigate();
@@ -76,16 +76,29 @@ export function InputPage() {
         setError(null);
 
         try {
-            const response = await api.post<AnalysisResult>('/analyze', {
+            // api.post<T> returns { status: string, data: T } where T is the nested data
+            // Backend sends: { status: 'success', data: { id, fileName, result... } }
+            const response = await api.post<{ id: string }>('/analyze', {
                 code,
                 fileName,
                 language,
                 mode,
             });
 
-            // Navigate to dashboard with result
-            navigate(`/dashboard/${response.data.id}`);
+            console.log('📥 API Response:', response);
+
+            if (response.status === 'success' && response.data.id) {
+                // Navigate to dashboard with result
+                navigate(`/dashboard/${response.data.id}`);
+            } else {
+                console.error('❌ Response check failed:', {
+                    status: response.status,
+                    data: response.data,
+                });
+                setError('Failed to create analysis');
+            }
         } catch (err) {
+            console.error('❌ API Error:', err);
             setError(err instanceof Error ? err.message : 'Analysis failed');
         } finally {
             setIsLoading(false);
