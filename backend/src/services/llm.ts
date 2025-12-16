@@ -102,6 +102,41 @@ B -- No --> D[Error]
 // ============================================================================
 // Call LLM
 // ============================================================================
+// ============================================================================
+// Helpers
+// ============================================================================
+
+interface CodeAnchor {
+    line: number;
+    type: 'API' | 'EFFECT' | 'RETURN' | 'HOOK';
+    content: string;
+}
+
+function analyzeCodeAnchors(code: string): CodeAnchor[] {
+    const lines = code.split('\n');
+    const anchors: CodeAnchor[] = [];
+
+    lines.forEach((line, index) => {
+        const l = line.trim();
+        const lineNum = index + 1;
+
+        // 1. API Calls
+        if (l.match(/fetch\(|axios\.|query\(|mutation\(/i)) {
+            anchors.push({ line: lineNum, type: 'API', content: l.substring(0, 50) });
+        }
+        // 2. Effects
+        else if (l.startsWith('useEffect')) {
+            anchors.push({ line: lineNum, type: 'EFFECT', content: 'Side Effect Trigger' });
+        }
+        // 3. Early Returns (Guards)
+        else if (l.startsWith('if') && l.includes('return')) {
+            anchors.push({ line: lineNum, type: 'RETURN', content: 'Logic Guard' });
+        }
+    });
+
+    return anchors;
+}
+
 export async function callLLM(
     code: string,
     fileName: string,
@@ -117,8 +152,21 @@ export async function callLLM(
         return generateMockResponse(fileName, language, code);
     }
 
+    // 1. Deterministic Anchor Analysis
+    const anchors = analyzeCodeAnchors(code);
+    const anchorList = anchors.map(a => `- Line ${a.line} [${a.type}]: ${a.content}`).join('\n');
+
     const systemPrompt = buildSystemPrompt(mode);
-    const userPrompt = `Analyze this ${language} code from "${fileName}": \n\n\`\`\`${language}\n${code}\n\`\`\``;
+    const userPrompt = `Analyze this ${language} code from "${fileName}".
+
+CRITICAL INSTRUCTION:
+You MUST include nodes for the following DETECTED ANCHORS in the code. Do not skip them:
+${anchorList}
+
+CODE:
+\`\`\`${language}
+${code}
+\`\`\``;
 
     try {
         console.log(`🤖 Calling LLM (${model})...`);
@@ -239,12 +287,20 @@ AUDIT RULES:
    - ❌ "!confirm(...)" -> ✅ "Did user confirm?"
    - Must have "Yes" and "No" edges.
 
-3. CHECK LOGIC: Does the flow matches the code execution path?
+3. CHECK MISSING LOGIC (STRICT):
+   - ❌ MISSING API CALLS: If the code has \`fetch()\` or \`async/await\`, it MUST be in the flowchart.
+   - ❌ MISSING SIDE EFFECTS: If \`useEffect\` triggers a function, that function MUST be visualized.
+   - ❌ MISSING GUARDS: If there is a \`if (loading) return ...\`, it MUST be a Diamond node.
+
+4. CHECK CONTINUITY:
+   - Do NOT skip from \`useEffect\` directly to \`Render\` if there is logic in between.
 
 OUTPUT FORMAT:
 CRITIQUE:
 - Node X has wrong label...
 - Missing specific edge...
+- Missing API call in useEffect...
+- Missing Loading State check...
 
 JSON:
 \`\`\`json

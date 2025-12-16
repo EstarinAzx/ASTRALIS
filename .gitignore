@@ -13,7 +13,7 @@ out/
 src/generated/
 
 # Environment
-
+.env
 
 # IDE
 .vscode/

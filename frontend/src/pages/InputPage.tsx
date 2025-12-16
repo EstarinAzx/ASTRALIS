@@ -65,6 +65,8 @@ export function InputPage() {
         }
     }, []);
 
+    const [loadingStage, setLoadingStage] = useState('Generating...');
+
     // Handle generate
     const handleGenerate = async () => {
         if (!code.trim()) {
@@ -74,6 +76,25 @@ export function InputPage() {
 
         setIsLoading(true);
         setError(null);
+        setLoadingStage('Analyzing code structure...');
+
+        // Granular loading simulation
+        const stages = [
+            { t: 2500, msg: '🧠 Planning flowchart logic (Mermaid)...' },
+            { t: 6000, msg: '🎨 Generating visual elements...' },
+            { t: 12000, msg: '🛡️ Validating coverage gaps...' },
+            { t: 18000, msg: '🕵️ Verifier Agent: Auditing logic...' },
+            { t: 24000, msg: '✨ Final Polish & Refinement...' },
+        ];
+
+        const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+        stages.forEach(({ t, msg }) => {
+            const timeout = setTimeout(() => {
+                setLoadingStage(msg);
+            }, t);
+            timeouts.push(timeout);
+        });
 
         try {
             // api.post<T> returns { status: string, data: T } where T is the nested data
@@ -101,7 +122,10 @@ export function InputPage() {
             console.error('❌ API Error:', err);
             setError(err instanceof Error ? err.message : 'Analysis failed');
         } finally {
+            // Clear timeouts and reset state
+            timeouts.forEach(clearTimeout);
             setIsLoading(false);
+            setLoadingStage('Generating...');
         }
     };
 
@@ -245,7 +269,7 @@ export function InputPage() {
                             {isLoading ? (
                                 <>
                                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Generating...
+                                    {loadingStage}
                                 </>
                             ) : (
                                 <>

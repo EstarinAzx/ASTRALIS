@@ -84,10 +84,41 @@ export function DashboardPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-                <div className="text-center">
-                    <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-[var(--color-primary)]" />
-                    <p className="text-[var(--text-secondary)]">Loading analysis...</p>
+            <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center flex-col">
+                <div className="text-center space-y-6 max-w-md w-full px-6">
+                    <div className="relative w-20 h-20 mx-auto">
+                        <div className="absolute inset-0 border-4 border-[var(--color-primary)]/20 rounded-full animate-ping"></div>
+                        <div className="absolute inset-0 border-4 border-t-[var(--color-primary)] rounded-full animate-spin"></div>
+                        <Loader2 className="absolute inset-0 m-auto w-8 h-8 text-[var(--color-primary)] animate-pulse" />
+                    </div>
+
+                    <div className="space-y-2">
+                        <h3 className="text-xl font-medium text-[var(--text-primary)] animate-pulse">
+                            Loading analysis result...
+                        </h3>
+                        <p className="text-sm text-[var(--text-secondary)]">
+                            This typically takes 20-40 seconds for complex files.
+                        </p>
+                    </div>
+
+                    {/* Progress Bar Simulation */}
+                    <div className="w-full bg-[var(--bg-secondary)] h-1.5 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-[var(--color-primary)] animate-[progress_30s_ease-in-out_infinite]"
+                            style={{ width: '0%', animationFillMode: 'forwards', animationName: 'progress-loading' }}
+                        ></div>
+                    </div>
+
+                    <style>{`
+                        @keyframes progress-loading {
+                            0% { width: 5%; }
+                            10% { width: 10%; }
+                            30% { width: 40%; }
+                            60% { width: 70%; }
+                            90% { width: 95%; }
+                            100% { width: 98%; }
+                        }
+                    `}</style>
                 </div>
             </div>
         );
