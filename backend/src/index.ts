@@ -11,6 +11,12 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
 
+// Debug: Check if env vars are loaded
+console.log('🔑 ENV CHECK:');
+console.log('  - LLM_API_KEY present:', !!process.env.LLM_API_KEY);
+console.log('  - LLM_MODEL:', process.env.LLM_MODEL);
+console.log('  - DATABASE_URL present:', !!process.env.DATABASE_URL);
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 

@@ -13,9 +13,7 @@ out/
 src/generated/
 
 # Environment
-.env
-.env.local
-.env.*.local
+
 
 # IDE
 .vscode/

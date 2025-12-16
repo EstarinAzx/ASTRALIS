@@ -131,33 +131,50 @@ RESPOND WITH ONLY VALID JSON:
   ]
 }
 
-⚠️ CRITICAL EDGE RULES - FOLLOW EXACTLY:
+🔴🔴🔴 CRITICAL EDGE RULES - YOU MUST FOLLOW THESE 🔴🔴🔴
 
 1. EVERY node (except final render) MUST have outgoing edge(s)
 
-2. DECISION NODES (shape: "diamond") - MANDATORY:
-   ✅ MUST have EXACTLY 2 outgoing edges - one "Yes", one "No"
-   ✅ Example for a decision "Is response OK?":
-      { "id": "e5", "source": "check_response", "target": "handle_success", "label": "Yes" },
-      { "id": "e6", "source": "check_response", "target": "handle_error", "label": "No" }
-   ❌ WRONG: Only having one edge from a diamond
-   ❌ WRONG: Diamond with no "No" edge
+2. ⚠️ DECISION DIAMONDS - ABSOLUTE REQUIREMENT:
+   Every diamond node MUST have EXACTLY 2 edges with LABELS:
    
-3. Create ERROR/FAILURE nodes for "No" branches:
-   - Every "No" edge must point to an error handling node (color: "red")
-   - Example: "Show validation error", "Handle API failure", "Display error message"
+   ✅ REQUIRED FORMAT:
+   { "id": "e5", "source": "diamond_id", "target": "success_node", "label": "Yes" }
+   { "id": "e6", "source": "diamond_id", "target": "failure_node", "label": "No" }
+   
+   ❌ NEVER DO THIS (no labels):
+   { "id": "e5", "source": "diamond_id", "target": "next_node" }  // MISSING LABEL!
+   
+   ❌ NEVER DO THIS (only one edge):
+   Only having Yes edge without No edge
 
-4. Regular nodes: one edge to next step (no label)
+3. The "label" field MUST be exactly "Yes" or "No" (case sensitive!)
+   - "label": "Yes" → for the success/true path
+   - "label": "No" → for the failure/false path
 
-5. Edges must form CONNECTED graph - no orphan nodes!
+4. Create nodes for BOTH paths:
+   - Yes path → usually continue normal flow (could be same as No path merge point)
+   - No path → error handling, return early, or merge back to main flow
 
-6. Count check: If you have N decision diamonds, you MUST have 2N edges from them (N "Yes" + N "No")
+5. Regular (non-diamond) nodes: edge to next step WITHOUT label
+
 
 SHAPES:
 - "rectangle" = State, definitions, assignments, setup steps
 - "diamond" = if/else, conditionals, checks (MUST have Yes/No branches)
 - "rounded" = Start/end nodes, final renders
 - "hexagon" = API calls, fetch, async operations
+
+⚠️ DIAMOND LABEL RULES - CRITICAL:
+- The "condition" and "label" for diamonds MUST be PLAIN ENGLISH QUESTIONS
+- ❌ WRONG: "!editingProduct", "confirm('Delete?')", "response.ok"
+- ✅ RIGHT: "Is editing a product?", "User confirmed delete?", "Was response successful?"
+- Always phrase as a YES/NO question in natural language
+- Examples:
+  * Code: if (!user) → Diamond: "Is user logged in?"
+  * Code: if (response.ok) → Diamond: "Was API call successful?"
+  * Code: if (confirm('Sure?')) → Diamond: "Did user confirm action?"
+  * Code: if (items.length > 0) → Diamond: "Are there items in the list?"
 
 COLORS:
 - "blue" = Imports, setup, initialization
@@ -206,6 +223,16 @@ CODE SNIPPET RULES:
 - For interfaces: include ALL properties, even nested ones
 - For functions: include the FULL function body
 - If code is long, that's OK - include it all
+
+LINE RANGE RULES:
+- lineStart = first line of the code section
+- lineEnd = LAST line of the code section (including closing braces)
+- For FUNCTIONS: lineStart = function keyword line, lineEnd = closing } brace
+  * Example: function foo() { ... } on lines 10-50 → lineStart: 10, lineEnd: 50
+- For INTERFACES/TYPES: include opening brace to closing brace
+  * Example: interface User { ... } on lines 5-20 → lineStart: 5, lineEnd: 20
+- For COMPONENTS: cover the entire component function body
+- NEVER set lineStart === lineEnd unless it truly is a single-line statement
 
 VERIFICATION: Before responding, verify:
 □ First node starts at line 1
