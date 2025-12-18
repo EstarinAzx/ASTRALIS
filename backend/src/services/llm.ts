@@ -442,9 +442,10 @@ ${code}
             return generateMockResponse(fileName, language, code);
         }
 
-        // 1. GAP VALIDATION (Mathematical)
-        console.log('🛡️ Step 1: Running Gap Validator...');
-        const gapFilled = validateAndFillGaps(parsed, code, fileName, language);
+        // 1. GAP VALIDATION - DISABLED (user requested no gap filling)
+        // console.log('🛡️ Step 1: Running Gap Validator...');
+        // const gapFilled = validateAndFillGaps(parsed, code, fileName, language);
+        const gapFilled = parsed; // Pass through without gap filling
 
         // 2. VERIFIER AGENT (LLM Audit)
         console.log('🕵️ Step 2: Running Verifier Agent...');
@@ -790,6 +791,22 @@ function detectCodeType(code: string, lineStart: number, lineEnd: number): { lab
 // ============================================================================
 // Mock Response - SMART CODE PARSER
 // ============================================================================
+
+/**
+ * Find the end line of a code block starting at a given line
+ * Uses brace counting to find matching closing brace
+ */
+function findBlockEnd(lines: string[], startIndex: number): number {
+    let braces = 0;
+    let j = startIndex;
+    do {
+        braces += (lines[j]?.match(/{/g) || []).length;
+        braces -= (lines[j]?.match(/}/g) || []).length;
+        j++;
+    } while (braces > 0 && j < lines.length);
+    return j; // Returns line number (1-indexed when used as lineEnd)
+}
+
 function generateMockResponse(fileName: string, language: string, code: string): AnalysisResult {
     const lines = code.split('\n');
     const nodes: FlowNode[] = [];
@@ -881,14 +898,18 @@ function generateMockResponse(fileName: string, language: string, code: string):
         }
     }
 
-    // Find function/component definition
+    // Find function/component definition (with proper line range)
+    // NOTE: Skip async functions - they're handled by the async function parser below
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if ((line.includes('export default function') || line.includes('export function') ||
-            (line.includes('function ') && !line.trim().startsWith('//'))) &&
+            (line.includes('function ') && !line.trim().startsWith('//') && !line.includes('async'))) &&
             !nodes.some(n => n.lineStart === i + 1)) {
             const match = line.match(/function\s+(\w+)/);
             const name = match?.[1] || 'Component';
+            const startLine = i + 1;
+            const endLine = findBlockEnd(lines, i);  // Calculate proper end line
+
             nodeId++;
             addNode({
                 id: `n${nodeId}`,
@@ -897,9 +918,9 @@ function generateMockResponse(fileName: string, language: string, code: string):
                 shape: 'rectangle',
                 color: 'green',
                 narrative: `Define the ${name} function component.`,
-                codeSnippet: line,
-                lineStart: i + 1,
-                lineEnd: i + 1,
+                codeSnippet: lines.slice(i, Math.min(i + 5, endLine)).join('\n'),
+                lineStart: startLine,
+                lineEnd: endLine,  // Now calculates full block end
                 logicTable: [{
                     step: '1',
                     trigger: 'Module load',

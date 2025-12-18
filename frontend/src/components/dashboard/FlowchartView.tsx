@@ -160,35 +160,44 @@ function convertToReactFlow(
         };
     });
 
-    // Create smooth bezier edges with subtle gray styling
-    const edges: Edge[] = flowEdges.map((edge, index) => ({
-        id: edge.id || `edge-${index}`,
-        source: edge.source,
-        target: edge.target,
-        label: edge.label,
-        animated: false,
-        type: 'bezier',  // Smooth curves
-        style: {
-            stroke: '#3a3a4a',
-            strokeWidth: 1.5,
-        },
-        labelStyle: {
-            fill: '#6a6a7a',
-            fontWeight: 500,
-            fontSize: 10,
-            background: 'transparent',
-        },
-        labelBgStyle: {
-            fill: '#1a1a24',
-            fillOpacity: 0.9,
-        },
-        labelBgPadding: [6, 3] as [number, number],
-        labelBgBorderRadius: 4,
-        // Route from correct handle for decision nodes
-        sourceHandle: edge.sourceHandle ||
-            (edge.label?.toLowerCase() === 'yes' ? 'yes' :
-                edge.label?.toLowerCase() === 'no' ? 'no' : undefined),
-    }));
+    // Create smooth bezier edges with colored decision branches
+    const edges: Edge[] = flowEdges.map((edge, index) => {
+        const isYes = edge.label?.toLowerCase() === 'yes';
+        const isNo = edge.label?.toLowerCase() === 'no';
+
+        // Determine edge color based on label
+        let strokeColor = '#3a3a4a'; // default gray
+        if (isYes) strokeColor = '#22c55e'; // green
+        if (isNo) strokeColor = '#ef4444'; // red
+
+        return {
+            id: edge.id || `edge-${index}`,
+            source: edge.source,
+            target: edge.target,
+            label: edge.label,
+            animated: false,
+            type: 'bezier',  // Smooth curves
+            style: {
+                stroke: strokeColor,
+                strokeWidth: isYes || isNo ? 2 : 1.5,
+            },
+            labelStyle: {
+                fill: strokeColor,
+                fontWeight: 600,
+                fontSize: 11,
+                background: 'transparent',
+            },
+            labelBgStyle: {
+                fill: '#1a1a24',
+                fillOpacity: 0.95,
+            },
+            labelBgPadding: [6, 3] as [number, number],
+            labelBgBorderRadius: 4,
+            // Route from correct handle for decision nodes
+            sourceHandle: edge.sourceHandle ||
+                (isYes ? 'yes' : isNo ? 'no' : undefined),
+        };
+    });
 
     return { nodes, edges };
 }
