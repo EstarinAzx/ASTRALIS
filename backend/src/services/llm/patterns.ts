@@ -32,6 +32,32 @@ const importPattern: CodePattern = {
 };
 
 // ============================================================================
+// Pattern: TypeScript Interfaces/Types
+// ============================================================================
+const interfacePattern: CodePattern = {
+    name: 'interface',
+    priority: 95,
+    match: (line) => /^(export\s+)?(interface|type)\s+\w+/.test(line.trim()),
+    extract: (line, index, lines) => {
+        const match = line.match(/(interface|type)\s+(\w+)/);
+        const name = match?.[2] || 'Type';
+        const isInterface = line.includes('interface');
+
+        const endLine = findBlockEnd(lines, index);
+
+        return {
+            label: `${isInterface ? 'Interface' : 'Type'}: ${name}`,
+            subtitle: 'Type Definition',
+            shape: 'rectangle',
+            color: 'blue',
+            lineStart: index + 1,
+            lineEnd: endLine,
+            codeSnippet: extractSnippet(lines, index, endLine),
+        };
+    },
+};
+
+// ============================================================================
 // Pattern: Express Route Handlers
 // ============================================================================
 const expressRoutePattern: CodePattern = {
@@ -119,8 +145,25 @@ const functionPattern: CodePattern = {
         if (funcMatch) name = funcMatch[1] ?? name;
         else if (arrowMatch) name = arrowMatch[1] ?? name;
 
+        // Check if this is a React component (capitalized, or has JSX return)
+        const isComponent = /^[A-Z]/.test(name);
         const endLine = findBlockEnd(lines, index);
 
+        // For React components, only capture the signature line
+        // This allows internal hooks/functions/render to be parsed separately
+        if (isComponent) {
+            return {
+                label: `Component: ${name}`,
+                subtitle: 'React Component',
+                shape: 'rounded',
+                color: 'cyan',
+                lineStart: index + 1,
+                lineEnd: index + 1, // Only signature line!
+                codeSnippet: line.trim(),
+            };
+        }
+
+        // Regular functions capture the whole block
         return {
             label: `Function: ${name}`,
             subtitle: 'Function Definition',
@@ -362,6 +405,32 @@ const tryCatchPattern: CodePattern = {
 };
 
 // ============================================================================
+// Pattern: Switch Statements
+// ============================================================================
+const switchPattern: CodePattern = {
+    name: 'switch',
+    priority: 48,
+    match: (line) => /switch\s*\(/.test(line),
+    extract: (line, index, lines) => {
+        const match = line.match(/switch\s*\(([^)]+)\)/);
+        const switchVar = match?.[1]?.trim() || 'value';
+
+        const endLine = findBlockEnd(lines, index);
+
+        return {
+            label: `Switch: ${switchVar}`,
+            subtitle: 'Multi-Branch Decision',
+            shape: 'diamond',
+            color: 'orange',
+            lineStart: index + 1,
+            lineEnd: endLine,
+            codeSnippet: extractSnippet(lines, index, endLine),
+            isDecision: true,
+        };
+    },
+};
+
+// ============================================================================
 // Pattern: Return Statements (JSX)
 // ============================================================================
 const returnJsxPattern: CodePattern = {
@@ -434,6 +503,7 @@ const exportPattern: CodePattern = {
 // ============================================================================
 export const codePatterns: CodePattern[] = [
     importPattern,
+    interfacePattern,
     expressRoutePattern,
     asyncFunctionPattern,
     functionPattern,
@@ -444,6 +514,7 @@ export const codePatterns: CodePattern[] = [
     guardClausePattern,
     ifBlockPattern,
     tryCatchPattern,
+    switchPattern,
     returnJsxPattern,
     constDeclarationPattern,
     exportPattern,
