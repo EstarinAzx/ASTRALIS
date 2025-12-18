@@ -20,10 +20,49 @@ export function parseCode(code: string, fileName: string, language: string): Ana
     // Helper to add a node
     function addNode(
         match: PatternMatch,
-        patternName: string
+        patternName: string,
+        nextSectionLabel?: string
     ): string {
         nodeId++;
         const id = `n${nodeId}`;
+
+        // Check if this is a multi-line node that should have children
+        const lineSpan = (match.lineEnd - match.lineStart);
+        const shouldHaveChildren = lineSpan > 5 &&
+            (patternName === 'asyncFunction' || patternName === 'expressRoute');
+
+        let children: FlowNode[] | undefined;
+        let childEdges: FlowEdge[] | undefined;
+
+        if (shouldHaveChildren) {
+            // Parse internal content as sub-nodes (skip first line which is signature)
+            const parsed = parseSubNodes(match.lineStart + 1, match.lineEnd - 1);
+            if (parsed.children.length > 0) {
+                children = parsed.children;
+                childEdges = parsed.childEdges;
+
+                // Add "next section" info node at the end
+                if (nextSectionLabel) {
+                    const endNodeId = `sub${children.length + 1}`;
+                    children.push({
+                        id: endNodeId,
+                        label: `→ ${nextSectionLabel}`,
+                        subtitle: 'Next Section',
+                        shape: 'rounded',
+                        color: 'blue',
+                        narrative: `Continues to ${nextSectionLabel}`,
+                    });
+                    const lastChild = parsed.children[parsed.children.length - 1];
+                    if (lastChild && childEdges) {
+                        childEdges.push({
+                            id: `se${childEdges.length + 1}`,
+                            source: lastChild.id,
+                            target: endNodeId,
+                        });
+                    }
+                }
+            }
+        }
 
         nodes.push({
             id,
@@ -46,6 +85,9 @@ export function parseCode(code: string, fileName: string, language: string): Ana
                 lineStart: match.lineStart,
                 lineEnd: match.lineEnd,
             }],
+            children,
+            childEdges,
+            nextSectionLabel,
         });
 
         // Mark lines as matched
@@ -96,6 +138,63 @@ export function parseCode(code: string, fileName: string, language: string): Ana
         }
     }
 
+    /**
+     * Parse sub-nodes within a line range (for drill-down feature)
+     */
+    function parseSubNodes(startLine: number, endLine: number): { children: FlowNode[], childEdges: FlowEdge[] } {
+        const children: FlowNode[] = [];
+        const childEdges: FlowEdge[] = [];
+        let subNodeId = 0;
+        let prevChildId: string | null = null;
+
+        for (let i = startLine - 1; i < endLine && i < lines.length; i++) {
+            const line = lines[i];
+            if (!line || isEmptyOrComment(line)) continue;
+
+            // Try each pattern
+            for (const pattern of codePatterns) {
+                // Skip patterns that would match the parent itself
+                if (pattern.name === 'asyncFunction' || pattern.name === 'function') continue;
+
+                if (pattern.match(line, i, lines)) {
+                    const match = pattern.extract(line, i, lines);
+                    if (match && match.lineEnd <= endLine) {
+                        subNodeId++;
+                        const childId = `sub${subNodeId}`;
+
+                        children.push({
+                            id: childId,
+                            label: match.label,
+                            subtitle: match.subtitle,
+                            shape: match.shape,
+                            color: match.color,
+                            lineStart: match.lineStart,
+                            lineEnd: match.lineEnd,
+                            codeSnippet: match.codeSnippet,
+                            isDecision: match.isDecision,
+                            narrative: generateNarrative(match, pattern.name),
+                        });
+
+                        if (prevChildId) {
+                            childEdges.push({
+                                id: `se${childEdges.length + 1}`,
+                                source: prevChildId,
+                                target: childId,
+                            });
+                        }
+                        prevChildId = childId;
+
+                        // Skip to end of this match
+                        i = match.lineEnd - 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return { children, childEdges };
+    }
+
     // ========================================================================
     // Phase 1: Match all patterns
     // ========================================================================
@@ -144,8 +243,16 @@ export function parseCode(code: string, fileName: string, language: string): Ana
     let previousNodeId: string | null = null;
     const nodeIdMap = new Map<number, string>(); // lineStart -> nodeId
 
-    for (const { patternName, match } of finalMatches) {
-        const nodeId = addNode(match, patternName);
+    for (let i = 0; i < finalMatches.length; i++) {
+        const currentMatch = finalMatches[i];
+        if (!currentMatch) continue;
+        const { patternName, match } = currentMatch;
+
+        // Get the next section's label for the "next section" info node
+        const nextMatch = finalMatches[i + 1];
+        const nextSectionLabel = nextMatch?.match.label;
+
+        const nodeId = addNode(match, patternName, nextSectionLabel);
         nodeIdMap.set(match.lineStart, nodeId);
 
         // Handle branching for decision nodes

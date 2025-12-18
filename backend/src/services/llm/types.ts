@@ -30,6 +30,10 @@ export interface FlowNode {
     isDecision?: boolean;
     condition?: string;
     next?: string[];
+    // Sub-flowchart support (for drill-down)
+    children?: FlowNode[];
+    childEdges?: FlowEdge[];
+    nextSectionLabel?: string; // Label of next section (shown at end of sub-flow)
 }
 
 export interface FlowEdge {

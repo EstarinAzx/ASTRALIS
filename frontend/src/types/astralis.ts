@@ -51,18 +51,23 @@ export interface FlowNode {
     noTarget?: string;                // Node ID for No
 
     // Logic table for this section
-    logicTable: LogicStep[];
+    logicTable?: LogicStep[];
 
     // Connected nodes (for non-decision nodes)
     next?: string[];                  // Node IDs this connects to
 
     // Summary for narrative
-    narrative: string;
+    narrative?: string;
 
     // Source code for this section
-    codeSnippet: string;
-    lineStart: number;
-    lineEnd: number;
+    codeSnippet?: string;
+    lineStart?: number;
+    lineEnd?: number;
+
+    // Drill-down sub-flowchart support
+    children?: FlowNode[];
+    childEdges?: FlowEdge[];
+    nextSectionLabel?: string;        // Label shown at end of sub-flow
 }
 
 // Edge between nodes

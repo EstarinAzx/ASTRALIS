@@ -233,3 +233,109 @@ body {
   border-bottom-left-radius: 8px !important;
   border-bottom-right-radius: 8px !important;
 }
+
+/* ============================================================================
+   Sub-Flowchart Overlay (Drill-down feature)
+   ============================================================================ */
+.sub-flowchart-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  animation: overlayFadeIn 0.2s ease-out;
+}
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.sub-flowchart-container {
+  width: 85vw;
+  height: 75vh;
+  max-width: 1400px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(99, 102, 241, 0.15);
+  animation: containerSlideIn 0.25s ease-out;
+}
+
+@keyframes containerSlideIn {
+  from {
+    transform: scale(0.95) translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.sub-flowchart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sub-flowchart-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sub-flowchart-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.sub-flowchart-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sub-flowchart-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.sub-flowchart-flow {
+  flex: 1;
+  background: var(--bg-primary);
+}
+
+.sub-flowchart-footer {
+  padding: 10px 20px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+}

@@ -2,7 +2,7 @@
 // Flowchart View - Horizontal Layout with Dot Grid Background
 // ============================================================================
 
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import ReactFlow, {
     Background,
     BackgroundVariant,
@@ -16,6 +16,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { flowchartNodeTypes } from './FlowchartNodes';
+import SubFlowchartOverlay from './SubFlowchartOverlay';
 import type { FlowNode, FlowEdge } from '../../types/astralis';
 
 interface Props {
@@ -246,6 +247,20 @@ export function FlowchartView({ nodes: flowNodes, edges: flowEdges, selectedNode
         [onNodeSelect]
     );
 
+    // Handle node double-click for drill-down
+    const [expandedNode, setExpandedNode] = useState<FlowNode | null>(null);
+
+    const onNodeDoubleClick: NodeMouseHandler = useCallback(
+        (_, node) => {
+            const nodeData = node.data.nodeData as FlowNode;
+            // Only expand if node has children
+            if (nodeData?.children && nodeData.children.length > 0) {
+                setExpandedNode(nodeData);
+            }
+        },
+        []
+    );
+
     if (flowNodes.length === 0) {
         return (
             <div className="h-full flex items-center justify-center text-[#6a6a7a]">
@@ -274,6 +289,7 @@ export function FlowchartView({ nodes: flowNodes, edges: flowEdges, selectedNode
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onNodeClick={onNodeClick}
+                onNodeDoubleClick={onNodeDoubleClick}
                 nodeTypes={flowchartNodeTypes}
                 connectionLineType={ConnectionLineType.Bezier}
                 fitView
@@ -303,8 +319,16 @@ export function FlowchartView({ nodes: flowNodes, edges: flowEdges, selectedNode
 
             {/* Hint */}
             <div className="absolute bottom-4 left-4 z-10 text-xs text-[#4a4a5a] bg-[#1a1a24]/80 backdrop-blur px-3 py-1.5 rounded-lg border border-[#2a2a3a]">
-                💡 Click a node to view source code
+                💡 Click to view code • Double-click for drill-down
             </div>
+
+            {/* Sub-flowchart overlay for drill-down */}
+            {expandedNode && (
+                <SubFlowchartOverlay
+                    parentNode={expandedNode}
+                    onClose={() => setExpandedNode(null)}
+                />
+            )}
         </div>
     );
 }
