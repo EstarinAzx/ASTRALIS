@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import prisma from '../lib/prisma.js';
-import { callLLM } from '../services/llm.js';
+import { callLLM } from '../services/llm/index.js';
 import { authMiddleware, type AuthenticatedRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
 import type { AnalyzeRequest, VerbosityMode } from '../types/astralis.js';

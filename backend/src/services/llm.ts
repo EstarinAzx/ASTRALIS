@@ -1194,6 +1194,7 @@ function generateMockResponse(fileName: string, language: string, code: string):
         let ifBlockContent = '';
 
         if (line.includes('{')) {
+            // Multi-line if block
             let braces = 0;
             let j = i;
             do {
@@ -1206,6 +1207,20 @@ function generateMockResponse(fileName: string, language: string, code: string):
             // Extract what's inside the if block
             const blockLines = lines.slice(i + 1, ifBlockEnd - 1);
             ifBlockContent = blockLines.map(l => l.trim()).filter(l => l && !l.startsWith('//')).join('\n');
+        } else if (hasReturn) {
+            // Single-line if with inline return: if (!user) return <div>...</div>;
+            // Extract the return part after the condition
+            const returnMatch = line.match(/return\s+(.+?);?\s*$/);
+            if (returnMatch) {
+                ifBlockContent = `return ${returnMatch[1]}`;
+            } else {
+                // Fallback: everything after "return"
+                const returnIdx = line.indexOf('return');
+                if (returnIdx !== -1) {
+                    ifBlockContent = line.substring(returnIdx);
+                }
+            }
+            ifBlockEnd = i + 1; // Single line
         }
 
         // Check if there's a return inside (making it a guard)
