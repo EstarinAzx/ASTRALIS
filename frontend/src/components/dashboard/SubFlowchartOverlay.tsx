@@ -2,15 +2,16 @@
 // SubFlowchartOverlay - Drill-down view for node internals
 // ============================================================================
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import ReactFlow, {
     Background,
     Controls,
     type Node,
     type Edge,
+    type NodeMouseHandler,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { X } from 'lucide-react';
+import { X, Code } from 'lucide-react';
 import type { FlowNode, FlowEdge } from '../../types/astralis';
 import { flowchartNodeTypes } from './FlowchartNodes';
 
@@ -20,28 +21,30 @@ interface SubFlowchartOverlayProps {
 }
 
 export default function SubFlowchartOverlay({ parentNode, onClose }: SubFlowchartOverlayProps) {
+    // Selected node for inspector
+    const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
+
     // Convert FlowNode children to React Flow nodes
     const nodes: Node[] = useMemo(() => {
         if (!parentNode.children) return [];
 
         return parentNode.children.map((child, index) => ({
             id: child.id,
-            type: child.shape === 'diamond' ? 'decisionNode'
-                : child.shape === 'hexagon' ? 'asyncNode'
-                    : 'standardNode',
-            position: { x: 250 * index, y: 100 },
+            type: child.shape || 'rectangle',
+            position: { x: 280 * index, y: 100 },
             data: {
                 label: child.label,
                 subtitle: child.subtitle,
+                shape: child.shape || 'rectangle',
                 color: child.color,
                 lineStart: child.lineStart,
                 lineEnd: child.lineEnd,
                 isDecision: child.isDecision,
-                // Mark the "next section" node specially
-                isNextSection: child.subtitle === 'Next Section',
+                isSelected: selectedNode?.id === child.id,
+                nodeData: child,
             },
         }));
-    }, [parentNode.children]);
+    }, [parentNode.children, selectedNode]);
 
     // Convert childEdges to React Flow edges
     const edges: Edge[] = useMemo(() => {
@@ -56,6 +59,14 @@ export default function SubFlowchartOverlay({ parentNode, onClose }: SubFlowchar
             animated: true,
         }));
     }, [parentNode.childEdges]);
+
+    // Handle node click for inspector
+    const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
+        const nodeData = node.data.nodeData as FlowNode;
+        if (nodeData) {
+            setSelectedNode(nodeData);
+        }
+    }, []);
 
     // Handle ESC key
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -103,22 +114,56 @@ export default function SubFlowchartOverlay({ parentNode, onClose }: SubFlowchar
                     </button>
                 </div>
 
-                {/* React Flow */}
-                <div className="sub-flowchart-flow">
-                    <ReactFlow
-                        nodes={nodes}
-                        edges={edges}
-                        nodeTypes={flowchartNodeTypes}
-                        fitView
-                        fitViewOptions={{ padding: 0.3 }}
-                        proOptions={{ hideAttribution: true }}
-                        nodesDraggable={false}
-                        nodesConnectable={false}
-                        elementsSelectable={false}
-                    >
-                        <Background color="#334155" gap={20} />
-                        <Controls showInteractive={false} />
-                    </ReactFlow>
+                {/* Main content with flow and inspector side by side */}
+                <div className="sub-flowchart-body">
+                    {/* React Flow */}
+                    <div className="sub-flowchart-flow">
+                        <ReactFlow
+                            nodes={nodes}
+                            edges={edges}
+                            nodeTypes={flowchartNodeTypes}
+                            onNodeClick={onNodeClick}
+                            fitView
+                            fitViewOptions={{ padding: 0.3 }}
+                            proOptions={{ hideAttribution: true }}
+                            nodesDraggable={false}
+                            nodesConnectable={false}
+                        >
+                            <Background color="#334155" gap={20} />
+                            <Controls showInteractive={false} />
+                        </ReactFlow>
+                    </div>
+
+                    {/* Inspector panel */}
+                    <div className="sub-flowchart-inspector">
+                        {selectedNode ? (
+                            <>
+                                <div className="sub-inspector-header">
+                                    <Code size={16} />
+                                    <span>{selectedNode.label}</span>
+                                </div>
+                                <div className="sub-inspector-meta">
+                                    {selectedNode.subtitle && (
+                                        <span className="sub-inspector-tag">{selectedNode.subtitle}</span>
+                                    )}
+                                    {selectedNode.lineStart && (
+                                        <span className="sub-inspector-lines">
+                                            Lines {selectedNode.lineStart}-{selectedNode.lineEnd || selectedNode.lineStart}
+                                        </span>
+                                    )}
+                                </div>
+                                {selectedNode.codeSnippet && (
+                                    <pre className="sub-inspector-code">
+                                        <code>{selectedNode.codeSnippet}</code>
+                                    </pre>
+                                )}
+                            </>
+                        ) : (
+                            <div className="sub-inspector-empty">
+                                Click a node to inspect
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Footer hint */}

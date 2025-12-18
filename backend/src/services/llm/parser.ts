@@ -4,7 +4,7 @@
 
 import type { FlowNode, FlowEdge, AnalysisResult, PatternMatch, SectionColor } from './types.js';
 import { codePatterns } from './patterns.js';
-import { isEmptyOrComment } from './helpers.js';
+import { isEmptyOrComment, extractSnippet } from './helpers.js';
 
 /**
  * Parse code using pattern matching
@@ -140,6 +140,7 @@ export function parseCode(code: string, fileName: string, language: string): Ana
 
     /**
      * Parse sub-nodes within a line range (for drill-down feature)
+     * This parses INSIDE blocks (try, if) to show internal logic
      */
     function parseSubNodes(startLine: number, endLine: number): { children: FlowNode[], childEdges: FlowEdge[] } {
         const children: FlowNode[] = [];
@@ -147,48 +148,113 @@ export function parseCode(code: string, fileName: string, language: string): Ana
         let subNodeId = 0;
         let prevChildId: string | null = null;
 
+        function addChild(label: string, subtitle: string, shape: 'rectangle' | 'diamond' | 'rounded' | 'hexagon', color: 'blue' | 'green' | 'orange' | 'purple' | 'red' | 'cyan', lineStart: number, lineEnd: number, codeSnippet: string, isDecision?: boolean) {
+            subNodeId++;
+            const childId = `sub${subNodeId}`;
+
+            children.push({
+                id: childId,
+                label,
+                subtitle,
+                shape,
+                color,
+                lineStart,
+                lineEnd,
+                codeSnippet,
+                isDecision,
+                narrative: `Execute ${label}`,
+            });
+
+            if (prevChildId) {
+                childEdges.push({
+                    id: `se${childEdges.length + 1}`,
+                    source: prevChildId,
+                    target: childId,
+                });
+            }
+            prevChildId = childId;
+        }
+
         for (let i = startLine - 1; i < endLine && i < lines.length; i++) {
             const line = lines[i];
-            if (!line || isEmptyOrComment(line)) continue;
+            if (!line) continue;
+            const trimmed = line.trim();
 
-            // Try each pattern
-            for (const pattern of codePatterns) {
-                // Skip patterns that would match the parent itself
-                if (pattern.name === 'asyncFunction' || pattern.name === 'function') continue;
+            // Skip empty lines, comments, closing braces
+            if (!trimmed || trimmed.startsWith('//') || trimmed === '}' || trimmed === '});' || trimmed === ');') continue;
 
-                if (pattern.match(line, i, lines)) {
-                    const match = pattern.extract(line, i, lines);
-                    if (match && match.lineEnd <= endLine) {
-                        subNodeId++;
-                        const childId = `sub${subNodeId}`;
-
-                        children.push({
-                            id: childId,
-                            label: match.label,
-                            subtitle: match.subtitle,
-                            shape: match.shape,
-                            color: match.color,
-                            lineStart: match.lineStart,
-                            lineEnd: match.lineEnd,
-                            codeSnippet: match.codeSnippet,
-                            isDecision: match.isDecision,
-                            narrative: generateNarrative(match, pattern.name),
-                        });
-
-                        if (prevChildId) {
-                            childEdges.push({
-                                id: `se${childEdges.length + 1}`,
-                                source: prevChildId,
-                                target: childId,
-                            });
+            // await fetch - API call
+            if (trimmed.includes('await') && trimmed.includes('fetch')) {
+                const varMatch = line.match(/const\s+(\w+)\s*=/);
+                const varName = varMatch?.[1] || 'response';
+                // Find end of multi-line fetch
+                let fetchEnd = i;
+                if (!trimmed.includes(');')) {
+                    for (let j = i + 1; j < endLine && j < lines.length; j++) {
+                        if (lines[j]?.includes(');') || lines[j]?.includes('});')) {
+                            fetchEnd = j;
+                            break;
                         }
-                        prevChildId = childId;
-
-                        // Skip to end of this match
-                        i = match.lineEnd - 1;
-                        break;
                     }
                 }
+                addChild(`API: ${varName}`, 'await fetch()', 'hexagon', 'purple', i + 1, fetchEnd + 1, extractSnippet(lines, i, fetchEnd + 1));
+                i = fetchEnd;
+                continue;
+            }
+
+            // try block - parse inside
+            if (trimmed.startsWith('try {') || trimmed === 'try') {
+                addChild('Try Block', 'Error Handling', 'rounded', 'orange', i + 1, i + 1, trimmed);
+                // Don't skip - continue parsing inside the try
+                continue;
+            }
+
+            // catch block
+            if (trimmed.startsWith('catch')) {
+                addChild('Catch Error', 'Error Handler', 'rounded', 'red', i + 1, i + 1, trimmed);
+                continue;
+            }
+
+            // if statement
+            if (trimmed.startsWith('if (') || trimmed.startsWith('if(')) {
+                const condMatch = line.match(/if\s*\(([^)]+)\)/);
+                const cond = condMatch?.[1] || 'condition';
+                addChild(`If: ${cond.substring(0, 30)}`, 'Condition', 'diamond', 'orange', i + 1, i + 1, trimmed, true);
+                continue;
+            }
+
+            // State update (setOrders, setUsers, etc.)
+            if (trimmed.match(/^set[A-Z]\w*\(/)) {
+                const funcMatch = trimmed.match(/^(set[A-Z]\w*)\(/);
+                const funcName = funcMatch?.[1] || 'setState';
+                // Find end of setState call
+                let stateEnd = i;
+                let parenCount = (trimmed.match(/\(/g) || []).length - (trimmed.match(/\)/g) || []).length;
+                while (parenCount > 0 && stateEnd < endLine - 1) {
+                    stateEnd++;
+                    const nextLine = lines[stateEnd];
+                    if (nextLine) {
+                        parenCount += (nextLine.match(/\(/g) || []).length - (nextLine.match(/\)/g) || []).length;
+                    }
+                }
+                addChild(funcName, 'State Update', 'rectangle', 'green', i + 1, stateEnd + 1, extractSnippet(lines, i, stateEnd + 1));
+                i = stateEnd;
+                continue;
+            }
+
+            // const with assignment
+            if (trimmed.startsWith('const ') && trimmed.includes('=')) {
+                const varMatch = line.match(/const\s+(\w+)/);
+                const varName = varMatch?.[1] || 'variable';
+                addChild(`Const: ${varName}`, 'Variable', 'rectangle', 'blue', i + 1, i + 1, trimmed);
+                continue;
+            }
+
+            // console.log / console.error
+            if (trimmed.startsWith('console.')) {
+                const method = trimmed.startsWith('console.error') ? 'Log Error' : 'Log';
+                addChild(method, 'Debug', 'rectangle', 'blue', i + 1, i + 1, trimmed);
+                continue;
             }
         }
 

@@ -463,6 +463,44 @@ const returnJsxPattern: CodePattern = {
 };
 
 // ============================================================================
+// Pattern: Await Fetch (API calls inside functions)
+// ============================================================================
+const awaitFetchPattern: CodePattern = {
+    name: 'awaitFetch',
+    priority: 55, // Higher than constDeclaration
+    match: (line) => line.includes('await') && line.includes('fetch'),
+    extract: (line, index, lines) => {
+        // Check if this is a multi-line fetch call
+        let endLine = index;
+        if (!line.includes(';') && !line.includes(');')) {
+            // Multi-line - find the end
+            for (let i = index + 1; i < lines.length; i++) {
+                if (lines[i]?.includes(');') || lines[i]?.includes('});')) {
+                    endLine = i;
+                    break;
+                }
+            }
+        }
+
+        // Try to extract the URL/endpoint
+        const urlMatch = line.match(/fetch\(['"`]([^'"`\$]+)/);
+        const varMatch = line.match(/const\s+(\w+)\s*=/);
+        const varName = varMatch?.[1] || 'response';
+        const endpoint = urlMatch?.[1] ? urlMatch[1].split('/').pop() || 'API' : 'API';
+
+        return {
+            label: `Fetch: ${endpoint}`,
+            subtitle: varName,
+            shape: 'hexagon',
+            color: 'purple',
+            lineStart: index + 1,
+            lineEnd: endLine + 1,
+            codeSnippet: extractSnippet(lines, index, endLine + 1),
+        };
+    },
+};
+
+// ============================================================================
 // Pattern: Variable Declaration (const with Router, etc.)
 // ============================================================================
 const constDeclarationPattern: CodePattern = {
@@ -525,6 +563,7 @@ export const codePatterns: CodePattern[] = [
     ifBlockPattern,
     tryCatchPattern,
     switchPattern,
+    awaitFetchPattern,
     returnJsxPattern,
     constDeclarationPattern,
     exportPattern,
