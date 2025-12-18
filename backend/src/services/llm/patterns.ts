@@ -215,9 +215,19 @@ const useStatePattern: CodePattern = {
     name: 'useState',
     priority: 70,
     match: (line) => line.includes('useState'),
-    extract: (line, index) => {
+    extract: (line, index, lines) => {
         const match = line.match(/const\s+\[(\w+)/);
         const name = match?.[1] || 'state';
+
+        // Check if useState has multi-line object/array initializer
+        let endLine = index;
+        if (line.includes('useState({') || line.includes('useState([')) {
+            // Find closing brace/bracket
+            endLine = findBlockEnd(lines, index) - 1;
+        } else if (line.includes('useState(') && !line.includes(');')) {
+            // Might span multiple lines
+            endLine = findParenEnd(lines, index) - 1;
+        }
 
         return {
             label: `useState: ${name}`,
@@ -225,8 +235,8 @@ const useStatePattern: CodePattern = {
             shape: 'rectangle',
             color: 'green',
             lineStart: index + 1,
-            lineEnd: index + 1,
-            codeSnippet: line.trim(),
+            lineEnd: Math.max(endLine + 1, index + 1),
+            codeSnippet: extractSnippet(lines, index, endLine + 1),
         };
     },
 };
