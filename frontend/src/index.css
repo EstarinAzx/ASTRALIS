@@ -9,9 +9,11 @@
    ============================================================================ */
 :root {
   /* Primary Colors - Cyber/Tech inspired */
-  --color-primary: #6366f1; /* Indigo */
+  --color-primary: #6366f1;
+  /* Indigo */
   --color-primary-hover: #4f46e5;
-  --color-accent: #22d3ee; /* Cyan */
+  --color-accent: #22d3ee;
+  /* Cyan */
   --color-accent-hover: #06b6d4;
 
   /* Backgrounds */
@@ -36,12 +38,18 @@
   --color-info: #3b82f6;
 
   /* Layer Colors (for ASTRALIS sections) */
-  --layer-0: #3b82f6; /* Blue - Imports */
-  --layer-1: #8b5cf6; /* Purple - Summary */
-  --layer-2: #ec4899; /* Pink - Journey */
-  --layer-3: #f59e0b; /* Amber - Mermaid */
-  --layer-4: #22c55e; /* Green - Logic Table */
-  --layer-5: #06b6d4; /* Cyan - Code Map */
+  --layer-0: #3b82f6;
+  /* Blue - Imports */
+  --layer-1: #8b5cf6;
+  /* Purple - Summary */
+  --layer-2: #ec4899;
+  /* Pink - Journey */
+  --layer-3: #f59e0b;
+  /* Amber - Mermaid */
+  --layer-4: #22c55e;
+  /* Green - Logic Table */
+  --layer-5: #06b6d4;
+  /* Cyan - Code Map */
 }
 
 /* ============================================================================
@@ -107,6 +115,7 @@ body {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -114,9 +123,12 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 5px var(--border-glow);
   }
+
   50% {
     box-shadow: 0 0 20px var(--border-glow);
   }
@@ -130,9 +142,6 @@ body {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* ============================================================================
-   Mermaid Diagram Overrides
-   ============================================================================ */
 .mermaid {
   background: transparent !important;
 }
@@ -140,4 +149,87 @@ body {
 .mermaid svg {
   max-width: 100%;
   height: auto;
+}
+
+/* ============================================================================
+   Flowchart Visualizer Enhancements
+   ============================================================================ */
+
+/* Purple glow pulse animation for selected nodes */
+@keyframes purple-glow-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 25px rgba(139, 92, 246, 0.6);
+  }
+}
+
+.animate-purple-glow {
+  animation: purple-glow-pulse 2s ease-in-out infinite;
+}
+
+/* React Flow overrides for dark theme */
+.react-flow__node {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.react-flow__edge-path {
+  stroke-linecap: round;
+}
+
+.react-flow__edge-text {
+  font-size: 10px !important;
+}
+
+/* Smooth node transitions */
+.react-flow__node {
+  transition: transform 0.2s ease-out;
+}
+
+/* Hide default selection box */
+.react-flow__node.selected {
+  box-shadow: none !important;
+}
+
+/* Context menu styling */
+.node-context-menu {
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Controls panel styling */
+.react-flow__controls {
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  border-radius: 0 !important;
+}
+
+.react-flow__controls-button:first-child {
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom-left-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
 }
