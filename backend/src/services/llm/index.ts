@@ -77,6 +77,8 @@ export async function callLLM(
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
+                'HTTP-Referer': 'http://localhost:3001',
+                'X-Title': 'ASTRALIS Flowchart Visualizer',
             },
             body: JSON.stringify({
                 model,
