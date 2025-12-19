@@ -24,6 +24,7 @@ interface Props {
     edges: FlowEdge[];
     selectedNode: FlowNode | null;
     onNodeSelect: (node: FlowNode) => void;
+    sourceCode?: string;
 }
 
 // ============================================================================
@@ -206,7 +207,7 @@ function convertToReactFlow(
 // ============================================================================
 // Component
 // ============================================================================
-export function FlowchartView({ nodes: flowNodes, edges: flowEdges, selectedNode, onNodeSelect }: Props) {
+export function FlowchartView({ nodes: flowNodes, edges: flowEdges, selectedNode, onNodeSelect, sourceCode }: Props) {
     // Only recalculate on actual data change (not selection change)
     const { nodes: initialNodes, edges: initialEdges } = useMemo(
         () => convertToReactFlow(flowNodes, flowEdges, null),
@@ -326,6 +327,7 @@ export function FlowchartView({ nodes: flowNodes, edges: flowEdges, selectedNode
             {expandedNode && (
                 <SubFlowchartOverlay
                     parentNode={expandedNode}
+                    sourceCode={sourceCode}
                     onClose={() => setExpandedNode(null)}
                 />
             )}

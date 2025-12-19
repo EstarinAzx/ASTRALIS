@@ -226,6 +226,7 @@ export function DashboardPage() {
                         edges={result.edges || []}
                         selectedNode={selectedNode}
                         onNodeSelect={handleNodeSelect}
+                        sourceCode={result.sourceCode}
                     />
                 </div>
 

@@ -140,15 +140,26 @@ export function parseCode(code: string, fileName: string, language: string): Ana
 
     /**
      * Parse sub-nodes within a line range (for drill-down feature)
-     * This parses INSIDE blocks (try, if) to show internal logic
+     * This parses INSIDE blocks (try, if) to show internal logic with proper branching
      */
     function parseSubNodes(startLine: number, endLine: number): { children: FlowNode[], childEdges: FlowEdge[] } {
         const children: FlowNode[] = [];
         const childEdges: FlowEdge[] = [];
         let subNodeId = 0;
         let prevChildId: string | null = null;
+        let lastDecisionId: string | null = null;
+        let inElseBlock = false;
 
-        function addChild(label: string, subtitle: string, shape: 'rectangle' | 'diamond' | 'rounded' | 'hexagon', color: 'blue' | 'green' | 'orange' | 'purple' | 'red' | 'cyan', lineStart: number, lineEnd: number, codeSnippet: string, isDecision?: boolean) {
+        function addChild(
+            label: string,
+            subtitle: string,
+            shape: 'rectangle' | 'diamond' | 'rounded' | 'hexagon',
+            color: 'blue' | 'green' | 'orange' | 'purple' | 'red' | 'cyan',
+            lineStart: number,
+            lineEnd: number,
+            codeSnippet: string,
+            isDecision?: boolean
+        ): string {
             subNodeId++;
             const childId = `sub${subNodeId}`;
 
@@ -165,14 +176,40 @@ export function parseCode(code: string, fileName: string, language: string): Ana
                 narrative: `Execute ${label}`,
             });
 
+            // Handle edge creation based on context
             if (prevChildId) {
-                childEdges.push({
-                    id: `se${childEdges.length + 1}`,
-                    source: prevChildId,
-                    target: childId,
-                });
+                // If we're coming from an if block and entering else
+                if (inElseBlock && lastDecisionId) {
+                    // Connect from decision node's NO branch
+                    childEdges.push({
+                        id: `se${childEdges.length + 1}`,
+                        source: lastDecisionId,
+                        target: childId,
+                        sourceHandle: 'no',
+                        label: 'NO',
+                    });
+                    inElseBlock = false;
+                    lastDecisionId = null;
+                } else {
+                    childEdges.push({
+                        id: `se${childEdges.length + 1}`,
+                        source: prevChildId,
+                        target: childId,
+                        sourceHandle: isDecision ? undefined :
+                            (children.find(c => c.id === prevChildId)?.isDecision ? 'yes' : undefined),
+                        label: children.find(c => c.id === prevChildId)?.isDecision ? 'YES' : undefined,
+                    });
+                }
             }
+
             prevChildId = childId;
+
+            // Track decision nodes for branching
+            if (isDecision) {
+                lastDecisionId = childId;
+            }
+
+            return childId;
         }
 
         for (let i = startLine - 1; i < endLine && i < lines.length; i++) {
@@ -180,14 +217,19 @@ export function parseCode(code: string, fileName: string, language: string): Ana
             if (!line) continue;
             const trimmed = line.trim();
 
-            // Skip empty lines, comments, closing braces
-            if (!trimmed || trimmed.startsWith('//') || trimmed === '}' || trimmed === '});' || trimmed === ');') continue;
+            // Skip empty lines, comments, closing braces only
+            if (!trimmed || trimmed.startsWith('//') || trimmed === '}' || trimmed === '});') continue;
+
+            // else block - mark for NO branch from last decision
+            if (trimmed.startsWith('} else') || trimmed === 'else {' || trimmed === '} else {') {
+                inElseBlock = true;
+                continue;
+            }
 
             // await fetch - API call
             if (trimmed.includes('await') && trimmed.includes('fetch')) {
                 const varMatch = line.match(/const\s+(\w+)\s*=/);
                 const varName = varMatch?.[1] || 'response';
-                // Find end of multi-line fetch
                 let fetchEnd = i;
                 if (!trimmed.includes(');')) {
                     for (let j = i + 1; j < endLine && j < lines.length; j++) {
@@ -197,29 +239,63 @@ export function parseCode(code: string, fileName: string, language: string): Ana
                         }
                     }
                 }
-                addChild(`API: ${varName}`, 'await fetch()', 'hexagon', 'purple', i + 1, fetchEnd + 1, extractSnippet(lines, i, fetchEnd + 1));
+                addChild(`Fetch: ${varName}`, 'await fetch()', 'hexagon', 'purple', i + 1, fetchEnd + 1, extractSnippet(lines, i, fetchEnd + 1));
                 i = fetchEnd;
                 continue;
             }
 
-            // try block - parse inside
+            // await .json() - Parse JSON
+            if (trimmed.includes('await') && trimmed.includes('.json()')) {
+                const varMatch = line.match(/const\s+(\w+)\s*=/);
+                const varName = varMatch?.[1] || 'data';
+                addChild(`Parse: ${varName}`, 'await .json()', 'hexagon', 'cyan', i + 1, i + 1, trimmed);
+                continue;
+            }
+
+            // try block
             if (trimmed.startsWith('try {') || trimmed === 'try') {
                 addChild('Try Block', 'Error Handling', 'rounded', 'orange', i + 1, i + 1, trimmed);
-                // Don't skip - continue parsing inside the try
                 continue;
             }
 
             // catch block
-            if (trimmed.startsWith('catch')) {
+            if (trimmed.startsWith('catch') || trimmed.startsWith('} catch')) {
                 addChild('Catch Error', 'Error Handler', 'rounded', 'red', i + 1, i + 1, trimmed);
                 continue;
             }
 
-            // if statement
+            // finally block
+            if (trimmed.startsWith('finally') || trimmed.startsWith('} finally')) {
+                addChild('Finally', 'Cleanup', 'rounded', 'blue', i + 1, i + 1, trimmed);
+                continue;
+            }
+
+            // if statement - decision node
             if (trimmed.startsWith('if (') || trimmed.startsWith('if(')) {
                 const condMatch = line.match(/if\s*\(([^)]+)\)/);
                 const cond = condMatch?.[1] || 'condition';
-                addChild(`If: ${cond.substring(0, 30)}`, 'Condition', 'diamond', 'orange', i + 1, i + 1, trimmed, true);
+                addChild(`If: ${cond.substring(0, 25)}`, 'Condition', 'diamond', 'orange', i + 1, i + 1, trimmed, true);
+                continue;
+            }
+
+            // return statement
+            if (trimmed.startsWith('return')) {
+                const hasValue = trimmed.length > 7;
+                addChild(hasValue ? 'Return Value' : 'Return Early', 'Exit', 'rounded', 'red', i + 1, i + 1, trimmed);
+                continue;
+            }
+
+            // throw statement
+            if (trimmed.startsWith('throw')) {
+                addChild('Throw Error', 'Exception', 'rounded', 'red', i + 1, i + 1, trimmed);
+                continue;
+            }
+
+            // navigate call
+            if (trimmed.includes('navigate(')) {
+                const pathMatch = line.match(/navigate\(['"`]([^'"`]+)['"`]/);
+                const path = pathMatch?.[1] || 'page';
+                addChild(`Navigate: ${path.substring(0, 20)}`, 'Redirect', 'rounded', 'green', i + 1, i + 1, trimmed);
                 continue;
             }
 
@@ -227,7 +303,6 @@ export function parseCode(code: string, fileName: string, language: string): Ana
             if (trimmed.match(/^set[A-Z]\w*\(/)) {
                 const funcMatch = trimmed.match(/^(set[A-Z]\w*)\(/);
                 const funcName = funcMatch?.[1] || 'setState';
-                // Find end of setState call
                 let stateEnd = i;
                 let parenCount = (trimmed.match(/\(/g) || []).length - (trimmed.match(/\)/g) || []).length;
                 while (parenCount > 0 && stateEnd < endLine - 1) {
@@ -242,7 +317,15 @@ export function parseCode(code: string, fileName: string, language: string): Ana
                 continue;
             }
 
-            // const with assignment
+            // const with await (generic async call)
+            if (trimmed.startsWith('const ') && trimmed.includes('await')) {
+                const varMatch = line.match(/const\s+(\w+)\s*=/);
+                const varName = varMatch?.[1] || 'result';
+                addChild(`Await: ${varName}`, 'Async Call', 'hexagon', 'purple', i + 1, i + 1, trimmed);
+                continue;
+            }
+
+            // const with assignment (no await)
             if (trimmed.startsWith('const ') && trimmed.includes('=')) {
                 const varMatch = line.match(/const\s+(\w+)/);
                 const varName = varMatch?.[1] || 'variable';
@@ -253,7 +336,15 @@ export function parseCode(code: string, fileName: string, language: string): Ana
             // console.log / console.error
             if (trimmed.startsWith('console.')) {
                 const method = trimmed.startsWith('console.error') ? 'Log Error' : 'Log';
-                addChild(method, 'Debug', 'rectangle', 'blue', i + 1, i + 1, trimmed);
+                addChild(method, 'Debug', 'rectangle', 'cyan', i + 1, i + 1, trimmed);
+                continue;
+            }
+
+            // Generic function call (ends with semicolon, has parentheses)
+            if (trimmed.match(/^\w+\(/) && trimmed.endsWith(';')) {
+                const funcMatch = trimmed.match(/^(\w+)\(/);
+                const funcName = funcMatch?.[1] || 'call';
+                addChild(`Call: ${funcName}`, 'Function', 'rectangle', 'blue', i + 1, i + 1, trimmed);
                 continue;
             }
         }

@@ -501,19 +501,26 @@ const awaitFetchPattern: CodePattern = {
 };
 
 // ============================================================================
-// Pattern: Variable Declaration (const with Router, etc.)
+// Pattern: Variable Declaration (const with function/method calls)
 // ============================================================================
 const constDeclarationPattern: CodePattern = {
     name: 'constDeclaration',
     priority: 40,
-    match: (line) => /^const\s+\w+\s*=\s*\w+\s*\(/.test(line.trim()),
+    // Match: const x = funcName() OR const x = object.method()
+    match: (line) => /^const\s+\w+\s*=\s*[\w.]+\s*\(/.test(line.trim()),
     extract: (line, index) => {
-        const match = line.match(/const\s+(\w+)\s*=\s*(\w+)\s*\(/);
-        const varName = match?.[1] || 'variable';
-        const factoryName = match?.[2] || 'factory';
+        // Try to match function call or method call
+        const funcMatch = line.match(/const\s+(\w+)\s*=\s*(\w+)\s*\(/);
+        const methodMatch = line.match(/const\s+(\w+)\s*=\s*([\w.]+)\s*\(/);
+
+        const varName = funcMatch?.[1] || methodMatch?.[1] || 'variable';
+        const callName = funcMatch?.[2] || methodMatch?.[2] || 'call';
+
+        // Shorten long method chains for display
+        const displayCall = callName.length > 20 ? callName.split('.').pop() : callName;
 
         return {
-            label: `${varName} = ${factoryName}()`,
+            label: `${varName} = ${displayCall}()`,
             subtitle: 'Initialization',
             shape: 'rectangle',
             color: 'blue',
