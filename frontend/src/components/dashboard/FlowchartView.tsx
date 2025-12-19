@@ -111,20 +111,20 @@ function calculateHorizontalLayout(
         });
     });
 
-    // Position nodes - HORIZONTAL layout (X for columns, Y for rows within column)
-    const nodeWidth = 200;
-    const nodeHeight = 60;
-    const horizontalSpacing = 100;  // Space between columns
-    const verticalSpacing = 40;     // Space between nodes in same column
+    // Position nodes - VERTICAL layout (Y for rows, X for columns within row)
+    const nodeWidth = 220;
+    const nodeHeight = 70;
+    const verticalSpacing = 80;     // Space between rows (levels)
+    const horizontalSpacing = 60;   // Space between nodes in same row
 
     levelGroups.forEach((nodeIds, level) => {
-        const totalHeight = nodeIds.length * nodeHeight + (nodeIds.length - 1) * verticalSpacing;
-        const startY = -totalHeight / 2 + nodeHeight / 2;
+        const totalWidth = nodeIds.length * nodeWidth + (nodeIds.length - 1) * horizontalSpacing;
+        const startX = -totalWidth / 2 + nodeWidth / 2;
 
         nodeIds.forEach((nodeId, index) => {
             positions.set(nodeId, {
-                x: level * (nodeWidth + horizontalSpacing),  // Columns go left-to-right
-                y: startY + index * (nodeHeight + verticalSpacing),  // Stack vertically
+                x: startX + index * (nodeWidth + horizontalSpacing),  // Spread horizontally
+                y: level * (nodeHeight + verticalSpacing),            // Rows go top-to-bottom
             });
         });
     });

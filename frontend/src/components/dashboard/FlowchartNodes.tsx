@@ -77,12 +77,12 @@ function AstralisNode({ data, selected }: NodeProps<NodeData>) {
                 ${isSelected ? 'scale-105' : 'hover:scale-[1.02]'}
             `}
         >
-            {/* Input handle - Left side */}
+            {/* Input handle - Top */}
             <Handle
                 type="target"
-                position={Position.Left}
+                position={Position.Top}
                 className="!w-2 !h-2 !bg-[#3a3a4a] !border-[#4a4a5a] !border"
-                style={{ left: -4 }}
+                style={{ top: -4 }}
             />
 
             {/* Node body */}
@@ -155,32 +155,32 @@ function AstralisNode({ data, selected }: NodeProps<NodeData>) {
                 )}
             </div>
 
-            {/* Output handles - Right side */}
+            {/* Output handles - Bottom */}
             {isDecision ? (
                 <>
-                    {/* Yes branch - top right */}
+                    {/* Yes branch - bottom left */}
                     <Handle
                         type="source"
-                        position={Position.Right}
+                        position={Position.Bottom}
                         id="yes"
                         className="!w-2 !h-2 !bg-emerald-500 !border-emerald-400 !border"
-                        style={{ right: -4, top: '30%' }}
+                        style={{ bottom: -4, left: '30%' }}
                     />
                     {/* No branch - bottom right */}
                     <Handle
                         type="source"
-                        position={Position.Right}
+                        position={Position.Bottom}
                         id="no"
                         className="!w-2 !h-2 !bg-red-500 !border-red-400 !border"
-                        style={{ right: -4, top: '70%' }}
+                        style={{ bottom: -4, left: '70%' }}
                     />
                 </>
             ) : (
                 <Handle
                     type="source"
-                    position={Position.Right}
+                    position={Position.Bottom}
                     className="!w-2 !h-2 !bg-[#3a3a4a] !border-[#4a4a5a] !border"
-                    style={{ right: -4 }}
+                    style={{ bottom: -4 }}
                 />
             )}
         </div>

@@ -47,14 +47,14 @@ export default function SubFlowchartOverlay({ parentNode, sourceCode, onClose }:
         }
     }, [selectedNode]);
 
-    // Convert FlowNode children to React Flow nodes
+    // Convert FlowNode children to React Flow nodes (vertical layout)
     const initialNodes: Node[] = useMemo(() => {
         if (!parentNode.children) return [];
 
         return parentNode.children.map((child, index) => ({
             id: child.id,
             type: child.shape || 'rectangle',
-            position: { x: 280 * index, y: 100 },
+            position: { x: 0, y: 120 * index },  // Vertical stacking
             data: {
                 label: child.label,
                 subtitle: child.subtitle,
