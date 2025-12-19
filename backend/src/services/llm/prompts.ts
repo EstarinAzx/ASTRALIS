@@ -61,17 +61,11 @@ DO NOT CHANGE
 - children/childEdges (parser-determined for drill-down)
 
 ═══════════════════════════════════════════════════════════════════════════════
-NODE TYPES REFERENCE
+NODE COLOR REFERENCE (All nodes use unified card design)
 ═══════════════════════════════════════════════════════════════════════════════
-SHAPES:
-- rectangle: Standard operations, imports, declarations, hooks
-- diamond: Decisions (if/else, switch) - has YES/NO branches
-- rounded: Entry/exit points, returns, try/catch blocks
-- hexagon: Async operations, API calls, side effects
-
 COLORS:
 - blue: Imports, exports, constants, setup code
-- green: State updates, success paths, navigation
+- green: State updates, hooks, success paths, navigation
 - orange: Decisions, conditionals, warnings
 - purple: Async operations, API calls, side effects
 - red: Error handling, guards, early returns, exceptions
