@@ -264,12 +264,13 @@ const useEffectPattern: CodePattern = {
 };
 
 // ============================================================================
-// Pattern: Custom Hooks
+// Pattern: Custom Hooks (useParams, useNavigate, useSearchParams, etc.)
 // ============================================================================
 const customHookPattern: CodePattern = {
     name: 'customHook',
     priority: 65,
-    match: (line) => /=\s*use[A-Z]\w+\s*\(/.test(line) && !line.includes('useState') && !line.includes('useEffect'),
+    // Match: const x = useHook(), const { x } = useHook(), const x = useHook<T>()
+    match: (line) => /=\s*use[A-Z]\w+\s*[<(]/.test(line) && !line.includes('useState') && !line.includes('useEffect'),
     extract: (line, index) => {
         const match = line.match(/use[A-Z]\w+/);
         const hookName = match?.[0] || 'useHook';

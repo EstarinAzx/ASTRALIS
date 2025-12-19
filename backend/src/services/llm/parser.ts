@@ -58,6 +58,7 @@ export function parseCode(code: string, fileName: string, language: string): Ana
                             id: `se${childEdges.length + 1}`,
                             source: lastChild.id,
                             target: endNodeId,
+                            label: 'continues',
                         });
                     }
                 }
@@ -325,6 +326,14 @@ export function parseCode(code: string, fileName: string, language: string): Ana
                 continue;
             }
 
+            // Standalone await (no const assignment) - e.g., await signup(), await delay()
+            if (trimmed.startsWith('await ') && !trimmed.startsWith('const ')) {
+                const funcMatch = trimmed.match(/await\s+(\w+)/);
+                const funcName = funcMatch?.[1] || 'async';
+                addChild(`Await: ${funcName}`, 'Async Call', 'hexagon', 'purple', i + 1, i + 1, trimmed);
+                continue;
+            }
+
             // const with assignment (no await)
             if (trimmed.startsWith('const ') && trimmed.includes('=')) {
                 const varMatch = line.match(/const\s+(\w+)/);
@@ -340,11 +349,13 @@ export function parseCode(code: string, fileName: string, language: string): Ana
                 continue;
             }
 
-            // Generic function call (ends with semicolon, has parentheses)
-            if (trimmed.match(/^\w+\(/) && trimmed.endsWith(';')) {
+            // Generic function/method call (funcName(); or obj.method();)
+            if (trimmed.match(/^[\w.]+\(/) && trimmed.endsWith(';')) {
+                // Try to extract meaningful name
+                const methodMatch = trimmed.match(/\.(\w+)\(/);
                 const funcMatch = trimmed.match(/^(\w+)\(/);
-                const funcName = funcMatch?.[1] || 'call';
-                addChild(`Call: ${funcName}`, 'Function', 'rectangle', 'blue', i + 1, i + 1, trimmed);
+                const name = methodMatch?.[1] || funcMatch?.[1] || 'call';
+                addChild(`Call: ${name}`, 'Method', 'rectangle', 'blue', i + 1, i + 1, trimmed);
                 continue;
             }
         }

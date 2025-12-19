@@ -96,6 +96,11 @@ export default function SubFlowchartOverlay({ parentNode, sourceCode, onClose }:
             type: 'smoothstep',
             style: { stroke: '#6366f1', strokeWidth: 2 },
             animated: true,
+            label: edge.label,
+            labelStyle: { fill: '#a78bfa', fontSize: 10, fontWeight: 500 },
+            labelBgStyle: { fill: '#1a1a24', fillOpacity: 0.9 },
+            labelBgPadding: [4, 2] as [number, number],
+            labelBgBorderRadius: 3,
         }));
     }, [parentNode.childEdges]);
 
